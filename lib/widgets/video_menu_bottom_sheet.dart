@@ -11,6 +11,7 @@ import '../services/douban_service.dart';
 import '../services/bangumi_service.dart';
 import '../utils/image_url.dart';
 import 'fullscreen_image_viewer.dart';
+import '../models/search_result.dart';
 
 /// 自定义滚动物理，在展开状态下的顶部向下拖拽时触发收起
 class CollapsibleScrollPhysics extends ClampingScrollPhysics {
@@ -64,6 +65,8 @@ class VideoMenuBottomSheet extends StatefulWidget {
   final Function(VideoMenuAction) onActionSelected;
   final VoidCallback onClose;
   final String from; // 来源场景
+  final List<SearchResult>? originalResults;
+  final Function(SearchResult)? onSourceSelected;
 
   const VideoMenuBottomSheet({
     super.key,
@@ -72,6 +75,8 @@ class VideoMenuBottomSheet extends StatefulWidget {
     required this.onActionSelected,
     required this.onClose,
     this.from = 'playrecord',
+    this.originalResults,
+    this.onSourceSelected,
   });
 
   /// 显示视频菜单底部弹窗（对外公开）
@@ -81,6 +86,8 @@ class VideoMenuBottomSheet extends StatefulWidget {
     required bool isFavorited,
     required Function(VideoMenuAction) onActionSelected,
     String from = 'playrecord',
+    List<SearchResult>? originalResults,
+    Function(SearchResult)? onSourceSelected,
   }) {
     showModalBottomSheet(
       context: context,
@@ -92,6 +99,8 @@ class VideoMenuBottomSheet extends StatefulWidget {
         onActionSelected: onActionSelected,
         onClose: () => Navigator.of(context).pop(),
         from: from,
+        originalResults: originalResults,
+        onSourceSelected: onSourceSelected,
       ),
     );
   }
@@ -627,7 +636,7 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
                                 : // 聚合来源：显示播放源数量并可点击
                                   widget.from == 'agg'
                                       ? GestureDetector(
-                                          onTap: () => _showSourcesDialog(context, themeService),
+                                          onTap: _showSourcesDialog,
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -1205,8 +1214,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             title: '播放',
             subtitle: _getEpisodeSubtitle(),
             onTap: () {
-              widget.onActionSelected(VideoMenuAction.play);
               widget.onClose();
+              widget.onActionSelected(VideoMenuAction.play);
             },
           ),
           
@@ -1243,8 +1252,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             title: '播放',
             subtitle: _getEpisodeSubtitle(),
             onTap: () {
-              widget.onActionSelected(VideoMenuAction.play);
               widget.onClose();
+              widget.onActionSelected(VideoMenuAction.play);
             },
           ),
           
@@ -1281,8 +1290,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             title: '播放',
             subtitle: _getEpisodeSubtitle(),
             onTap: () {
-              widget.onActionSelected(VideoMenuAction.play);
               widget.onClose();
+              widget.onActionSelected(VideoMenuAction.play);
             },
           ),
           
@@ -1295,8 +1304,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
             iconColor: const Color(0xFFE74C3C),
             title: '取消收藏',
             onTap: () {
-              widget.onActionSelected(VideoMenuAction.unfavorite);
               widget.onClose();
+              widget.onActionSelected(VideoMenuAction.unfavorite);
             },
           ),
         ],
@@ -1354,8 +1363,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           title: '播放',
           subtitle: _getEpisodeSubtitle(),
           onTap: () {
-            widget.onActionSelected(VideoMenuAction.play);
             widget.onClose();
+            widget.onActionSelected(VideoMenuAction.play);
           },
         ),
         
@@ -1369,8 +1378,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           iconColor: const Color(0xFFE74C3C),
           title: widget.isFavorited ? '取消收藏' : '收藏',
           onTap: () {
-            widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
             widget.onClose();
+            widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
           },
         ),
       ];
@@ -1425,8 +1434,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           title: '播放',
           subtitle: _getEpisodeSubtitle(),
           onTap: () {
-            widget.onActionSelected(VideoMenuAction.play);
             widget.onClose();
+            widget.onActionSelected(VideoMenuAction.play);
           },
         ),
         
@@ -1440,8 +1449,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           iconColor: const Color(0xFFE74C3C),
           title: widget.isFavorited ? '取消收藏' : '收藏',
           onTap: () {
-            widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
             widget.onClose();
+            widget.onActionSelected(widget.isFavorited ? VideoMenuAction.unfavorite : VideoMenuAction.favorite);
           },
         ),
         
@@ -1454,8 +1463,8 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
           iconColor: const Color(0xFFE74C3C),
           title: '删除记录',
           onTap: () {
-            widget.onActionSelected(VideoMenuAction.deleteRecord);
             widget.onClose();
+            widget.onActionSelected(VideoMenuAction.deleteRecord);
           },
         ),
       ],
@@ -1592,9 +1601,11 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
   }
 
   /// 显示播放源列表对话框
-  void _showSourcesDialog(BuildContext context, ThemeService themeService) {
-    final sourceNames = widget.videoInfo.sourceName.split(', ');
-    
+  void _showSourcesDialog() {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final sources = widget.originalResults;
+    if (sources == null || sources.isEmpty) return;
+
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -1608,7 +1619,7 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
               maxWidth: 320,
             ),
             decoration: BoxDecoration(
-              color: themeService.isDarkMode 
+              color: themeService.isDarkMode
                   ? const Color(0xFF2C2C2C)
                   : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -1631,131 +1642,65 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: themeService.isDarkMode 
+                      color: themeService.isDarkMode
                           ? const Color(0xFFFFFFFF)
                           : const Color(0xFF2C2C2C),
                     ),
                   ),
                 ),
-                
-                // 播放源网格
+
+                // 播放源列表
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: Column(
-                        children: [
-                          // 将播放源按两列分组
-                          ...List.generate(
-                            (sourceNames.length / 2).ceil(),
-                            (rowIndex) {
-                              final startIndex = rowIndex * 2;
-                              final endIndex = (startIndex + 2).clamp(0, sourceNames.length);
-                              final rowSources = sourceNames.sublist(startIndex, endIndex);
-                              
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
+                        children: sources.map((source) {
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.of(context).pop(); // Close dialog
+                                widget.onClose(); // Close menu
+                                widget.onSourceSelected?.call(source);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
                                   children: [
-                                    // 第一列
-                                    Expanded(
-                                      child: Container(
-                                        margin: const EdgeInsets.only(right: 4),
-                                        decoration: BoxDecoration(
-                                          color: themeService.isDarkMode 
-                                              ? const Color(0xFF3A3A3A)
-                                              : const Color(0xFFF5F5F5),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            onTap: () {
-                                              Navigator.of(context).pop();
-                                              // 这里可以添加选择特定播放源的逻辑
-                                            },
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 14,
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  rowSources[0],
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    height: 1.2,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                                    Text(
+                                      source.sourceName,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                    
-                                    // 第二列（如果存在）
-                                    if (rowSources.length > 1)
-                                      Expanded(
-                                        child: Container(
-                                          margin: const EdgeInsets.only(left: 4),
-                                          decoration: BoxDecoration(
-                                            color: themeService.isDarkMode 
-                                                ? const Color(0xFF3A3A3A)
-                                                : const Color(0xFFF5F5F5),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              onTap: () {
-                                                Navigator.of(context).pop();
-                                                // 这里可以添加选择特定播放源的逻辑
-                                              },
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 14,
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    rowSources[1],
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w500,
-                                                      height: 1.2,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
+                                    const Spacer(),
+                                    if (source.episodes.length > 1)
+                                      Text(
+                                        '${source.episodes.length}集',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          color: themeService.isDarkMode
+                                              ? Colors.white70
+                                              : Colors.black54,
                                         ),
-                                      )
-                                    else
-                                      // 如果只有一列，添加空白占位
-                                      const Expanded(child: SizedBox()),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.chevron_right, size: 20),
                                   ],
                                 ),
-                              );
-                            },
-                          ),
-                        ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
                   ),
                 ),
-                
+
                 // 底部间距
                 const SizedBox(height: 20),
               ],

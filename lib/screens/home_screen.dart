@@ -130,44 +130,125 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       // 热门电影组件
                       HotMoviesSection(
-                        onMovieTap: _onVideoTap,
+                        onMovieTap: (videoInfo) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                title: videoInfo.title,
+                                stype: 'movie',
+                                year: videoInfo.year,
+                              ),
+                            ),
+                          );
+                        },
                         onMoreTap: () => _onBottomNavChanged(1), // 切换到电影页面
-                        onGlobalMenuAction: (videoInfo, action) => _onGlobalMenuActionFromVideoInfo(videoInfo, action),
+                        onGlobalMenuAction: (videoInfo, action) {
+                          if (action == VideoMenuAction.play) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  title: videoInfo.title,
+                                  stype: 'movie',
+                                  year: videoInfo.year,
+                                ),
+                              ),
+                            );
+                          } else {
+                            _onGlobalMenuActionFromVideoInfo(videoInfo, action);
+                          }
+                        },
                       ),
                       // 热门剧集组件
                       HotTvSection(
-                        onTvTap: _onVideoTap,
+                        onTvTap: (videoInfo) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                title: videoInfo.title,
+                                year: videoInfo.year,
+                              ),
+                            ),
+                          );
+                        },
                         onMoreTap: () => _onBottomNavChanged(2), // 切换到剧集页面
-                        onGlobalMenuAction: (videoInfo, action) => _onGlobalMenuActionFromVideoInfo(videoInfo, action),
+                        onGlobalMenuAction: (videoInfo, action) {
+                          if (action == VideoMenuAction.play) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  title: videoInfo.title,
+                                  year: videoInfo.year,
+                                ),
+                              ),
+                            );
+                          } else {
+                            _onGlobalMenuActionFromVideoInfo(videoInfo, action);
+                          }
+                        },
                       ),
                       // 新番放送组件
                       BangumiSection(
-                        onBangumiTap: _onVideoTap,
+                        onBangumiTap: (videoInfo) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                title: videoInfo.title,
+                                year: videoInfo.year,
+                              ),
+                            ),
+                          );
+                        },
                         onMoreTap: () => _onBottomNavChanged(3), // 切换到动漫页面
                         onGlobalMenuAction: (videoInfo, action) {
-                          // 转换为PlayRecord用于处理
-                          final playRecord = PlayRecord(
-                            id: videoInfo.id,
-                            source: videoInfo.source,
-                            title: videoInfo.title,
-                            sourceName: videoInfo.sourceName,
-                            year: videoInfo.year,
-                            cover: videoInfo.cover,
-                            index: videoInfo.index,
-                            totalEpisodes: videoInfo.totalEpisodes,
-                            playTime: videoInfo.playTime,
-                            totalTime: videoInfo.totalTime,
-                            saveTime: videoInfo.saveTime,
-                            searchTitle: videoInfo.searchTitle,
-                          );
-                          _onGlobalMenuAction(playRecord, action);
+                          if (action == VideoMenuAction.play) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  title: videoInfo.title,
+                                  year: videoInfo.year,
+                                ),
+                              ),
+                            );
+                          } else {
+                            _onGlobalMenuActionFromVideoInfo(videoInfo, action);
+                          }
                         },
                       ),
                       // 热门综艺组件
                       HotShowSection(
-                        onShowTap: _onVideoTap,
+                        onShowTap: (videoInfo) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PlayerScreen(
+                                title: videoInfo.title,
+                                year: videoInfo.year,
+                              ),
+                            ),
+                          );
+                        },
                         onMoreTap: () => _onBottomNavChanged(4), // 切换到综艺页面
-                        onGlobalMenuAction: (videoInfo, action) => _onGlobalMenuActionFromVideoInfo(videoInfo, action),
+                        onGlobalMenuAction: (videoInfo, action) {
+                          if (action == VideoMenuAction.play) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlayerScreen(
+                                  title: videoInfo.title,
+                                  year: videoInfo.year,
+                                ),
+                              ),
+                            );
+                          } else {
+                            _onGlobalMenuActionFromVideoInfo(videoInfo, action);
+                          }
+                        },
                       ),
                     ],
                   )

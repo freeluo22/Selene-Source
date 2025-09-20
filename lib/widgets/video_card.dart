@@ -7,6 +7,7 @@ import '../models/video_info.dart';
 import '../services/theme_service.dart';
 import 'video_menu_bottom_sheet.dart';
 import '../utils/image_url.dart';
+import '../models/search_result.dart';
 
 /// 视频卡片组件
 class VideoCard extends StatelessWidget {
@@ -16,6 +17,8 @@ class VideoCard extends StatelessWidget {
   final double? cardWidth; // 卡片宽度，用于响应式布局
   final Function(VideoMenuAction)? onGlobalMenuAction; // 视频菜单操作回调
   final bool isFavorited; // 是否已收藏
+  final List<SearchResult>? originalResults;
+  final Function(SearchResult)? onSourceSelected;
 
   const VideoCard({
     super.key,
@@ -25,6 +28,8 @@ class VideoCard extends StatelessWidget {
     this.cardWidth,
     this.onGlobalMenuAction,
     this.isFavorited = false,
+    this.originalResults,
+    this.onSourceSelected,
   });
 
   @override
@@ -393,6 +398,8 @@ class VideoCard extends StatelessWidget {
         isFavorited: isFavorited,
         onActionSelected: onGlobalMenuAction!,
         from: from,
+        originalResults: originalResults,
+        onSourceSelected: onSourceSelected,
       );
     }
   }

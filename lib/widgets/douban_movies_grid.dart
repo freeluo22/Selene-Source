@@ -12,7 +12,7 @@ class DoubanMoviesGrid extends StatelessWidget {
   final List<DoubanMovie>? movies;
   final bool isLoading;
   final String? errorMessage;
-  final Function(PlayRecord) onVideoTap;
+  final Function(VideoInfo) onVideoTap;
   final Function(VideoInfo, VideoMenuAction)? onGlobalMenuAction;
   final String contentType; // 'movie' 或 'tv'
 
@@ -197,7 +197,7 @@ class DoubanMoviesGrid extends StatelessWidget {
             
             return VideoCard(
               videoInfo: videoInfo,
-              onTap: () => onVideoTap(movie.toPlayRecord()),
+              onTap: () => onVideoTap(videoInfo),
               from: 'douban',
               cardWidth: itemWidth,
               onGlobalMenuAction: onGlobalMenuAction != null ? (action) => onGlobalMenuAction!(videoInfo, action) : null,

@@ -14,6 +14,7 @@ class SearchResultAggGrid extends StatefulWidget {
   final ThemeService themeService;
   final Function(VideoInfo)? onVideoTap;
   final Function(VideoInfo, VideoMenuAction)? onGlobalMenuAction;
+  final Function(SearchResult)? onSourceSelected;
   final bool hasReceivedStart;
 
   const SearchResultAggGrid({
@@ -22,6 +23,7 @@ class SearchResultAggGrid extends StatefulWidget {
     required this.themeService,
     this.onVideoTap,
     this.onGlobalMenuAction,
+    this.onSourceSelected,
     required this.hasReceivedStart,
   });
 
@@ -128,125 +130,21 @@ class _SearchResultAggGridState extends State<SearchResultAggGrid>
               child: VideoCard(
                 key: ValueKey(key), // 使用聚合键作为唯一key
                 videoInfo: videoInfo,
-                onTap: widget.onVideoTap != null ? () => _handleVideoTap(aggregatedResult) : null,
+                onTap: widget.onVideoTap != null ? () => widget.onVideoTap!(videoInfo) : null,
                 from: 'agg', // 标记为聚合卡片
                 cardWidth: itemWidth, // 传递计算出的宽度
                 onGlobalMenuAction: widget.onGlobalMenuAction != null 
-                    ? (action) => _handleGlobalMenuAction(aggregatedResult, action) 
+                    ? (action) => widget.onGlobalMenuAction!(videoInfo, action)
                     : null,
                 isFavorited: false, // 聚合卡片不显示收藏状态
+                originalResults: aggregatedResult.originalResults,
+                onSourceSelected: widget.onSourceSelected,
               ),
             );
           },
         );
       },
     );
-  }
-
-  /// 处理视频点击
-  void _handleVideoTap(AggregatedSearchResult aggregatedResult) {
-    if (widget.onVideoTap != null) {
-      // 对于聚合结果，显示源选择对话框
-      _showSourceSelectionDialog(aggregatedResult);
-    }
-  }
-
-  /// 显示源选择对话框
-  void _showSourceSelectionDialog(AggregatedSearchResult aggregatedResult) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: widget.themeService.isDarkMode 
-              ? const Color(0xFF2C2C2C)
-              : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            '选择播放源',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: widget.themeService.isDarkMode 
-                  ? const Color(0xFFFFFFFF)
-                  : const Color(0xFF2C2C2C),
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: aggregatedResult.originalResults.map((result) {
-              return ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9b59b6).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.play_arrow,
-                    color: const Color(0xFF9b59b6),
-                    size: 20,
-                  ),
-                ),
-                title: Text(
-                  result.sourceName,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: widget.themeService.isDarkMode 
-                        ? const Color(0xFFFFFFFF)
-                        : const Color(0xFF2C2C2C),
-                  ),
-                ),
-                subtitle: Text(
-                  '${result.episodes.length}集',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: widget.themeService.isDarkMode 
-                        ? const Color(0xFFB0B0B0)
-                        : const Color(0xFF666666),
-                  ),
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  widget.onVideoTap!(result.toVideoInfo());
-                },
-              );
-            }).toList(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                '取消',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: widget.themeService.isDarkMode 
-                      ? const Color(0xFFB0B0B0)
-                      : const Color(0xFF666666),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  /// 处理全局菜单操作
-  void _handleGlobalMenuAction(AggregatedSearchResult aggregatedResult, VideoMenuAction action) {
-    if (widget.onGlobalMenuAction != null) {
-      if (action == VideoMenuAction.play) {
-        // 播放操作显示源选择对话框
-        _showSourceSelectionDialog(aggregatedResult);
-      } else {
-        // 其他操作直接传递
-        final videoInfo = aggregatedResult.toVideoInfo();
-        widget.onGlobalMenuAction!(videoInfo, action);
-      }
-    }
   }
 
   Widget _buildEmptyState() {

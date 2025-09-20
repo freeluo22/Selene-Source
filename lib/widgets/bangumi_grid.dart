@@ -12,7 +12,7 @@ class BangumiGrid extends StatelessWidget {
   final List<BangumiItem>? bangumiItems;
   final bool isLoading;
   final String? errorMessage;
-  final Function(PlayRecord) onVideoTap;
+  final Function(VideoInfo) onVideoTap;
   final Function(VideoInfo, VideoMenuAction)? onGlobalMenuAction;
   final String contentType; // 'anime' 或其他
 
@@ -197,7 +197,7 @@ class BangumiGrid extends StatelessWidget {
             
             return VideoCard(
               videoInfo: videoInfo,
-              onTap: () => onVideoTap(bangumiItem.toPlayRecord()),
+              onTap: () => onVideoTap(videoInfo),
               from: 'bangumi',
               cardWidth: itemWidth,
               onGlobalMenuAction: onGlobalMenuAction != null ? (action) => onGlobalMenuAction!(videoInfo, action) : null,

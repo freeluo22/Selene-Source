@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/pulsing_dots_indicator.dart';
 import '../widgets/bangumi_grid.dart';
 import '../widgets/simple_tab_switcher.dart';
+import 'player_screen.dart';
 
 class SelectorOption {
   final String label;
@@ -505,27 +506,37 @@ class _AnimeScreenState extends State<AnimeScreen> {
     await _fetchAnimeData(isRefresh: true);
   }
 
-  void _onVideoTap(PlayRecord playRecord) {
-    // Implement video tap logic
+  void _onVideoTap(VideoInfo videoInfo) {
+    if (_selectedCategoryValue == '剧场版') {
+      // 剧场版，传递 title 和 stype=movie
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PlayerScreen(
+            title: videoInfo.title,
+            stype: 'movie',
+            year: videoInfo.year,
+          ),
+        ),
+      );
+    } else {
+      // 每日放送或番剧，只传递 title
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PlayerScreen(
+            title: videoInfo.title,
+            year: videoInfo.year,
+          ),
+        ),
+      );
+    }
   }
 
   void _handleMenuAction(VideoInfo videoInfo, VideoMenuAction action) {
     switch (action) {
       case VideoMenuAction.play:
-        _onVideoTap(PlayRecord(
-          id: videoInfo.id,
-          source: videoInfo.source,
-          title: videoInfo.title,
-          sourceName: videoInfo.sourceName,
-          year: videoInfo.year,
-          cover: videoInfo.cover,
-          index: videoInfo.index,
-          totalEpisodes: videoInfo.totalEpisodes,
-          playTime: videoInfo.playTime,
-          totalTime: videoInfo.totalTime,
-          saveTime: videoInfo.saveTime,
-          searchTitle: videoInfo.searchTitle,
-        ));
+        _onVideoTap(videoInfo);
         break;
       case VideoMenuAction.doubanDetail:
         _launchURL('https://movie.douban.com/subject/${videoInfo.id}/');

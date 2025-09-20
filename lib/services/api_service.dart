@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'user_data_service.dart';
 import '../screens/login_screen.dart';
 import '../models/favorite_item.dart';
+import '../models/search_result.dart';
 
 /// API响应结果类
 class ApiResponse<T> {
@@ -540,6 +541,59 @@ class ApiService {
       }
     } catch (e) {
       return ApiResponse.error('自动登录异常: ${e.toString()}');
+    }
+  }
+
+  /// 获取视频详情
+  static Future<List<SearchResult>> fetchSourceDetail(String source, String id) async {
+    try {
+      final response = await get<SearchResult>(
+        '/api/detail',
+        queryParameters: {
+          'source': source,
+          'id': id,
+        },
+        fromJson: (data) => SearchResult.fromJson(data as Map<String, dynamic>),
+      );
+      
+      if (response.success && response.data != null) {
+        return [response.data!];
+      } else {
+        print('获取视频详情失败: ${response.message}');
+        return [];
+      }
+    } catch (e) {
+      print('获取视频详情失败: $e');
+      return [];
+    }
+  }
+
+  /// 搜索视频源数据
+  static Future<List<SearchResult>> fetchSourcesData(String query) async {
+    try {
+      final response = await get<Map<String, dynamic>>(
+        '/api/search',
+        queryParameters: {
+          'q': query.trim(),
+        },
+        fromJson: (data) => data as Map<String, dynamic>,
+      );
+      
+      if (response.success && response.data != null) {
+        final data = response.data!;
+        final results = data['results'] as List<dynamic>? ?? [];
+        
+        // 直接返回所有搜索结果，不进行过滤
+        return results
+            .map((item) => SearchResult.fromJson(item as Map<String, dynamic>))
+            .toList();
+      } else {
+        print('搜索失败: ${response.message}');
+        return [];
+      }
+    } catch (e) {
+      print('搜索失败: $e');
+      return [];
     }
   }
 

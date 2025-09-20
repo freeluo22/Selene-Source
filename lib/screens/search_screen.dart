@@ -13,6 +13,7 @@ import '../widgets/custom_switch.dart';
 import '../widgets/favorites_grid.dart';
 import '../widgets/search_result_agg_grid.dart';
 import '../widgets/search_results_grid.dart';
+import 'player_screen.dart';
 
 class SelectorOption {
   final String label;
@@ -1019,15 +1020,28 @@ class _SearchScreenState extends State<SearchScreen>
                           key: const ValueKey('agg_grid'),
                           results: _filteredSearchResults,
                           themeService: themeService,
-                          onVideoTap: widget.onVideoTap,
+                          onVideoTap: _onVideoTap,
                           onGlobalMenuAction: _onGlobalMenuAction,
+                          onSourceSelected: (SearchResult result) {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => PlayerScreen(
+                                          source: result.source,
+                                          id: result.id,
+                                          year: result.year,
+                                          title: result.title,
+                                          stitle: _searchQuery,
+                                          stype: result.episodes.length > 1 ? 'tv' : 'movie',
+                                        )));
+                          },
                           hasReceivedStart: _hasReceivedStart,
                         )
                       : SearchResultsGrid(
                           key: const ValueKey('list_grid'),
                           results: _filteredSearchResults,
                           themeService: themeService,
-                          onVideoTap: widget.onVideoTap,
+                          onVideoTap: _onVideoTap,
                           onGlobalMenuAction: _onGlobalMenuAction,
                           hasReceivedStart: _hasReceivedStart,
                         ),
@@ -1037,6 +1051,10 @@ class _SearchScreenState extends State<SearchScreen>
           ),
       ],
     );
+  }
+
+  void _onVideoTap(VideoInfo videoInfo) {
+    _onGlobalMenuAction(videoInfo, VideoMenuAction.play);
   }
 
   String _getProgressText() {
@@ -1114,11 +1132,37 @@ class _SearchScreenState extends State<SearchScreen>
 
   /// 处理视频菜单操作
   void _onGlobalMenuAction(VideoInfo videoInfo, VideoMenuAction action) {
+    final stitle = _searchQuery;
     switch (action) {
       case VideoMenuAction.play:
-        // 播放视频
-        if (widget.onVideoTap != null) {
-          widget.onVideoTap!(videoInfo);
+        if (_useAggregatedView) {
+          // 聚合卡片，只传递title和stitle，并从id中解析stype
+          final parts = videoInfo.id.split('_');
+          final type = parts.length > 2 ? parts.last : null;
+          final year = parts.length > 1 ? parts[1] : null;
+
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => PlayerScreen(
+                        title: videoInfo.title,
+                        stitle: stitle,
+                        stype: type,
+                        year: year,
+                      )));
+        } else {
+          // 非聚合卡片，传递完整信息
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => PlayerScreen(
+                        source: videoInfo.source,
+                        id: videoInfo.id,
+                        year: videoInfo.year,
+                        title: videoInfo.title,
+                        stype: videoInfo.totalEpisodes > 1 ? 'tv' : 'movie',
+                        stitle: stitle,
+                      )));
         }
         break;
       case VideoMenuAction.favorite:

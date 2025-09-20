@@ -9,6 +9,8 @@ class VideoPlayerWidget extends StatefulWidget {
   final double aspectRatio;
   final VoidCallback? onBackPressed;
   final Function(bool)? onFullscreenChange;
+  final Function(VideoPlayerWidgetController)? onControllerCreated;
+  final VoidCallback? onReady;
 
   const VideoPlayerWidget({
     super.key,
@@ -16,10 +18,51 @@ class VideoPlayerWidget extends StatefulWidget {
     this.aspectRatio = 16 / 9,
     this.onBackPressed,
     this.onFullscreenChange,
+    this.onControllerCreated,
+    this.onReady,
   });
 
   @override
   State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+/// VideoPlayerWidget 的控制器，用于外部控制播放器
+class VideoPlayerWidgetController {
+  final _VideoPlayerWidgetState _state;
+  
+  VideoPlayerWidgetController._(this._state);
+  
+  /// 动态更新视频播放 URL
+  Future<void> updateVideoUrl(String newVideoUrl) async {
+    await _state.updateVideoUrl(newVideoUrl);
+  }
+  
+  /// 跳转到指定进度
+  /// [position] 目标位置（秒）
+  Future<void> seekTo(Duration position) async {
+    await _state.seekTo(position);
+  }
+  
+  /// 获取当前播放位置
+  Duration? get currentPosition {
+    return _state._videoController?.value.position;
+  }
+  
+  /// 获取视频总时长
+  Duration? get duration {
+    return _state._videoController?.value.duration;
+  }
+  
+  /// 获取播放状态
+  bool get isPlaying {
+    return _state._videoController?.value.isPlaying ?? false;
+  }
+
+  /// 销毁播放器资源
+  void dispose() {
+    _state._videoController?.dispose();
+    _state._chewieController?.dispose();
+  }
 }
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
@@ -31,10 +74,40 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
+    // 设置初始屏幕方向为竖屏 
+    _setPortraitOrientation();
+    // 创建控制器并通知父组件
+    widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
     // 延迟初始化控制器，避免在 initState 中访问 context
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeController();
     });
+  }
+
+  // 设置竖屏方向
+  void _setPortraitOrientation() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+
+  // 设置横屏方向
+  void _setLandscapeOrientation() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
+  // 恢复屏幕方向为自动
+  void _restoreOrientation() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   void _initializeController() async {
@@ -65,10 +138,81 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           setState(() {
             _isInitialized = true;
           });
+          
+          // 触发 ready 事件
+          widget.onReady?.call();
         }
       } catch (e) {
         debugPrint('Error initializing video player: $e');
       }
+    }
+  }
+
+  /// 动态更新视频播放 URL
+  /// [newVideoUrl] 新的视频 URL
+  Future<void> updateVideoUrl(String newVideoUrl) async {
+    if (!mounted) return;
+    
+    try {
+      // 释放当前控制器
+      _chewieController?.dispose();
+      _videoController?.dispose();
+      
+      // 重置状态
+      setState(() {
+        _isInitialized = false;
+      });
+      
+      // 创建新的控制器
+      _videoController = VideoPlayerController.networkUrl(
+        Uri.parse(newVideoUrl),
+      );
+      
+      await _videoController!.initialize();
+      
+      if (mounted) {
+        _chewieController = ChewieController(
+          videoPlayerController: _videoController!,
+          autoPlay: true,
+          looping: false,
+          allowFullScreen: true,
+          allowMuting: true,
+          allowPlaybackSpeedChanging: true,
+          showOptions: true,
+          showControlsOnInitialize: true,
+          customControls: CustomChewieControls(
+            onBackPressed: widget.onBackPressed,
+            onFullscreenChange: _handleFullscreenChange,
+          ),
+        );
+        
+        setState(() {
+          _isInitialized = true;
+        });
+        
+        // 触发 ready 事件
+        widget.onReady?.call();
+      }
+    } catch (e) {
+      debugPrint('Error updating video URL: $e');
+      // 如果更新失败，保持当前状态
+      setState(() {
+        _isInitialized = false;
+      });
+    }
+  }
+
+  /// 跳转到指定进度
+  /// [position] 目标位置
+  Future<void> seekTo(Duration position) async {
+    if (!mounted || _videoController == null || !_videoController!.value.isInitialized) {
+      return;
+    }
+    
+    try {
+      await _videoController!.seekTo(position);
+    } catch (e) {
+      debugPrint('Error seeking to position: $e');
     }
   }
 
@@ -79,6 +223,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         _isFullscreen = isFullscreen;
       });
       
+      // 根据全屏状态设置屏幕方向
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (isFullscreen) {
+          _setLandscapeOrientation();
+        } else {
+          _setPortraitOrientation();
+        }
+      });
+      
       // 通知父组件全屏状态变化
       widget.onFullscreenChange?.call(isFullscreen);
     }
@@ -86,6 +239,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   void dispose() {
+    // 恢复屏幕方向为自动
+    _restoreOrientation();
     _videoController?.dispose();
     _chewieController?.dispose();
     super.dispose();
@@ -95,11 +250,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: widget.aspectRatio,
-      child: _isInitialized && _chewieController != null
-          ? Chewie(controller: _chewieController!)
-          : const Center(
-              child: CircularProgressIndicator(),
-            ),
+      child: Container(
+        color: Colors.black,
+        child: _isInitialized && _chewieController != null
+            ? Chewie(controller: _chewieController!)
+            : const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              ),
+      ),
     );
   }
 }
@@ -281,24 +441,12 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     _startHideTimer();
   }
 
-  // 先切换屏幕方向再退出全屏
-  Future<void> _exitFullscreenWithOrientationChange() async {
+  // 退出全屏
+  void _exitFullscreen() {
     // 检查widget是否仍然mounted
     if (!mounted) return;
     
-    // 先切换到竖屏
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    
-    // 等待屏幕方向切换完成
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    // 再次检查widget是否仍然mounted
-    if (!mounted) return;
-    
-    // 然后退出全屏
+    // 退出全屏，屏幕方向会在_handleFullscreenChange中处理
     _chewieController?.exitFullScreen();
     
     // 通知父组件全屏状态变化
@@ -364,9 +512,9 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
               child: GestureDetector(
                 onTap: () async {
                   _onUserInteraction();
-                  // 如果处于全屏状态，则先切换屏幕方向再退出全屏
+                  // 如果处于全屏状态，则退出全屏
                   if (isFullscreen) {
-                    await _exitFullscreenWithOrientationChange();
+                    _exitFullscreen();
                   } else {
                     // 否则调用父组件的返回回调
                     widget.onBackPressed?.call();
@@ -568,7 +716,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                           onTap: () {
                             _onUserInteraction();
                             if (isFullscreen) {
-                              _exitFullscreenWithOrientationChange();
+                              _exitFullscreen();
                             } else {
                               chewieController.enterFullScreen();
                               widget.onFullscreenChange(true);

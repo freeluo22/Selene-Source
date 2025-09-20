@@ -2,53 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
-/// M3U8 流质量信息
-class M3U8Quality {
-  final String resolution; // 分辨率 如 "1920x1080"
-  final String url; // 流地址
-  final List<String> segmentUrls; // 视频片段URL列表
-
-  M3U8Quality({
-    required this.resolution,
-    required this.url,
-    this.segmentUrls = const [],
-  });
-
-  @override
-  String toString() {
-    return 'M3U8Quality{resolution: $resolution, url: $url}';
-  }
-}
-
-/// 网络测速结果
-class SpeedTestResult {
-  final double downloadSpeed; // 下载速度 MB/s
-  final int latency; // 延迟 ms
-  final bool isSuccess; // 是否成功
-  final String error; // 错误信息
-
-  SpeedTestResult({
-    required this.downloadSpeed,
-    required this.latency,
-    this.isSuccess = true,
-    this.error = '',
-  });
-
-  /// 格式化速度显示
-  String get formattedSpeed {
-    if (downloadSpeed < 1) {
-      return '${(downloadSpeed * 1024).toStringAsFixed(1)} KB/s';
-    } else {
-      return '${downloadSpeed.toStringAsFixed(1)} MB/s';
-    }
-  }
-
-  @override
-  String toString() {
-    return 'SpeedTestResult{downloadSpeed: $downloadSpeed MB/s, latency: $latency ms, isSuccess: $isSuccess, error: $error}';
-  }
-}
-
 /// M3U8 解析和测速服务
 class M3U8Service {
   final Dio _dio = Dio();
@@ -88,13 +41,13 @@ class M3U8Service {
         _measureDownloadSpeed(segments),
       ]);
       
-      final resolution = futures[0] as String;
+      final resolutionData = futures[0] as Map<String, int>;
       final latency = futures[1] as int;
-      final downloadSpeed = futures[2] as double;
+      final downloadSpeedKBps = futures[2] as double;
       
       return {
-        'resolution': resolution,
-        'downloadSpeed': downloadSpeed,
+        'resolution': resolutionData,
+        'downloadSpeed': downloadSpeedKBps,
         'latency': latency,
         'success': true,
         'error': '',
@@ -102,7 +55,7 @@ class M3U8Service {
       
     } catch (e) {
       return {
-        'resolution': '未知',
+        'resolution': {'width': 0, 'height': 0},
         'downloadSpeed': 0.0,
         'latency': 0,
         'success': false,
@@ -200,7 +153,7 @@ class M3U8Service {
 
 
   /// 从 M3U8 文件获取分辨率
-  Future<String> _getResolutionFromM3U8(String m3u8Url) async {
+  Future<Map<String, int>> _getResolutionFromM3U8(String m3u8Url) async {
     try {
       final response = await _dio.get(m3u8Url);
       final content = response.data as String;
@@ -219,14 +172,21 @@ class M3U8Service {
           }
           
           if (params.containsKey('RESOLUTION')) {
-            return params['RESOLUTION']!;
+            final resolution = params['RESOLUTION']!;
+            final dimensions = resolution.split('x');
+            if (dimensions.length == 2) {
+              return {
+                'width': int.tryParse(dimensions[0]) ?? 0,
+                'height': int.tryParse(dimensions[1]) ?? 0,
+              };
+            }
           }
         }
       }
       
-      return '未知';
+      return {'width': 0, 'height': 0};
     } catch (e) {
-      return '未知';
+      return {'width': 0, 'height': 0};
     }
   }
 
@@ -266,15 +226,270 @@ class M3U8Service {
         return 0.0;
       }
       
-      // 计算下载速度 (MB/s)
+      // 计算下载速度 (KB/s)
       final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
-      final downloadSpeed = (totalBytes / 1024 / 1024) / elapsedSeconds;
+      final downloadSpeed = (totalBytes / 1024) / elapsedSeconds;
       
       return downloadSpeed;
     } catch (e) {
       return 0.0;
     }
   }
+
+  /// 批量获取所有源的流信息并选择最佳源
+  Future<Map<String, dynamic>> preferBestSource(List<dynamic> allSources) async {
+    if (allSources.isEmpty) {
+      return {
+        'bestSource': null,
+        'allSourcesSpeed': <String, Map<String, dynamic>>{},
+        'error': '没有可用的源',
+      };
+    }
+    
+    if (allSources.length == 1) {
+      return {
+        'bestSource': allSources.first,
+        'allSourcesSpeed': <String, Map<String, dynamic>>{},
+        'error': '',
+      };
+    }
+    
+    // 为每个源选择要测试的集数链接
+    final testUrls = <String, String>{}; // sourceId -> episodeUrl
+    
+    for (final source in allSources) {
+      final sourceId = '${source.source}_${source.id}';
+      String episodeUrl;
+      
+      // 选择第二集链接，如果没有第二集则选择第一集
+      if (source.episodes.length >= 2) {
+        episodeUrl = source.episodes[1]; // 第二集
+      } else if (source.episodes.isNotEmpty) {
+        episodeUrl = source.episodes[0]; // 第一集
+      } else {
+        continue; // 跳过没有集数的源
+      }
+      
+      testUrls[sourceId] = episodeUrl;
+    }
+    
+    // 并发获取所有源的流信息
+    final futures = testUrls.entries.map((entry) async {
+      final sourceId = entry.key;
+      final episodeUrl = entry.value;
+      
+      try {
+        final streamInfo = await getStreamInfo(episodeUrl).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            return {
+              'resolution': {'width': 0, 'height': 0},
+              'downloadSpeed': 0.0,
+              'latency': 0,
+              'success': false,
+              'error': '获取流信息超时',
+            };
+          },
+        );
+        return MapEntry(sourceId, streamInfo);
+      } catch (e) {
+        return MapEntry(sourceId, {
+          'resolution': {'width': 0, 'height': 0},
+          'downloadSpeed': 0.0,
+          'latency': 0,
+          'success': false,
+          'error': e.toString(),
+        });
+      }
+    });
+    
+    // 等待所有流信息获取完成
+    final results = await Future.wait(futures);
+    final streamInfoResults = <String, Map<String, dynamic>>{};
+    for (final result in results) {
+      streamInfoResults[result.key] = result.value;
+    }
+    
+    // 找出所有有效速度的最大值，用于线性映射
+    final validSpeeds = <double>[];
+    final validPings = <int>[];
+    
+    for (final source in allSources) {
+      final sourceId = '${source.source}_${source.id}';
+      final streamInfo = streamInfoResults[sourceId];
+      
+      if (streamInfo != null && streamInfo['success']) {
+        final downloadSpeed = streamInfo['downloadSpeed'] as double;
+        final latency = streamInfo['latency'] as int;
+        
+        if (downloadSpeed > 0) {
+          validSpeeds.add(downloadSpeed);
+        }
+        if (latency > 0) {
+          validPings.add(latency);
+        }
+      }
+    }
+    
+    // 计算基准值
+    final maxSpeed = validSpeeds.isNotEmpty ? validSpeeds.reduce((a, b) => a > b ? a : b) : 1024.0; // 默认1MB/s作为基准
+    final minPing = validPings.isNotEmpty ? validPings.reduce((a, b) => a < b ? a : b) : 50;
+    final maxPing = validPings.isNotEmpty ? validPings.reduce((a, b) => a > b ? a : b) : 1000;
+    
+    // 计算每个源的评分并排序
+    final sourceScores = <MapEntry<dynamic, double>>[];
+    final allSourcesSpeed = <String, Map<String, dynamic>>{};
+    
+    for (final source in allSources) {
+      final sourceId = '${source.source}_${source.id}';
+      final streamInfo = streamInfoResults[sourceId];
+      
+      if (streamInfo == null || !streamInfo['success']) {
+        continue; // 跳过获取失败的源
+      }
+      
+      final downloadSpeed = streamInfo['downloadSpeed'] as double;
+      final latency = streamInfo['latency'] as int;
+      final resolutionData = streamInfo['resolution'] as Map<String, int>;
+      
+      // 转换分辨率为标准格式
+      final resolution = _convertResolutionToString(resolutionData);
+      
+      // 计算综合评分
+      final score = _calculateSourceScore(
+        resolution,
+        downloadSpeed,
+        latency,
+        maxSpeed,
+        minPing,
+        maxPing,
+      );
+      
+      sourceScores.add(MapEntry(source, score));
+      
+      allSourcesSpeed[sourceId] = {
+        'quality': resolution,
+        'loadSpeed': _formatDownloadSpeed(downloadSpeed),
+        'pingTime': '${latency}ms',
+      };
+    }
+    
+    // 按综合评分排序，选择最佳播放源
+    sourceScores.sort((a, b) => b.value.compareTo(a.value));
+    
+    final bestSource = sourceScores.isNotEmpty ? sourceScores.first.key : allSources.first;
+    
+    return {
+      'bestSource': bestSource,
+      'allSourcesSpeed': allSourcesSpeed,
+      'error': '',
+    };
+  }
+
+  /// 计算源的综合评分
+  /// 使用线性映射算法，基于实际测速结果动态调整评分范围
+  /// 包含分辨率、下载速度和网络延迟三个维度的评分
+  double _calculateSourceScore(
+    String quality,
+    double speedKBps,
+    int latencyMs,
+    double maxSpeed,
+    int minPing,
+    int maxPing,
+  ) {
+    double score = 0;
+
+    // 分辨率评分 (40% 权重)
+    final qualityScore = _getQualityScore(quality);
+    score += qualityScore * 0.4;
+
+    // 下载速度评分 (40% 权重) - 基于最大速度线性映射
+    final speedScore = _getSpeedScore(speedKBps, maxSpeed);
+    score += speedScore * 0.4;
+
+    // 网络延迟评分 (20% 权重) - 基于延迟范围线性映射
+    final pingScore = _getPingScore(latencyMs, minPing, maxPing);
+    score += pingScore * 0.2;
+
+    return (score * 100).round() / 100.0; // 保留两位小数
+  }
+
+  /// 获取分辨率评分
+  double _getQualityScore(String quality) {
+    switch (quality.toLowerCase()) {
+      case '4k':
+      case '2160p':
+        return 100;
+      case '2k':
+      case '1440p':
+        return 85;
+      case '1080p':
+        return 75;
+      case '720p':
+        return 60;
+      case '480p':
+        return 40;
+      case 'sd':
+      case '360p':
+        return 20;
+      default:
+        return 0;
+    }
+  }
+
+  /// 获取下载速度评分
+  double _getSpeedScore(double speedKBps, double maxSpeed) {
+    if (speedKBps <= 0) return 30; // 无效速度给默认分
+    
+    // 基于最大速度线性映射，最高100分
+    final speedRatio = speedKBps / maxSpeed;
+    return (speedRatio * 100).clamp(0.0, 100.0);
+  }
+
+  /// 获取网络延迟评分
+  double _getPingScore(int latencyMs, int minPing, int maxPing) {
+    if (latencyMs <= 0) return 0; // 无效延迟给0分
+    
+    // 如果所有延迟都相同，给满分
+    if (maxPing == minPing) return 100;
+    
+    // 线性映射：最低延迟=100分，最高延迟=0分
+    final pingRatio = (maxPing - latencyMs) / (maxPing - minPing);
+    return (pingRatio * 100).clamp(0.0, 100.0);
+  }
+
+  /// 将分辨率数据转换为标准字符串格式
+  String _convertResolutionToString(Map<String, int> resolutionData) {
+    final width = resolutionData['width'] ?? 0;
+    final height = resolutionData['height'] ?? 0;
+    
+    if (width == 0 || height == 0) return '未知';
+    
+    // 根据经典宽度判断分辨率
+    if (width >= 3840) return '4K';      // 4K: 3840x2160
+    if (width >= 2560) return '2K';      // 2K: 2560x1440
+    if (width >= 1920) return '1080p';   // 1080p: 1920x1080
+    if (width >= 1280) return '720p';    // 720p: 1280x720
+    if (width >= 854) return '480p';     // 480p: 854x480
+    if (width >= 640) return '360p';     // 360p: 640x360
+    
+    return 'SD';
+  }
+
+  /// 格式化下载速度为字符串
+  String _formatDownloadSpeed(double speedKBps) {
+    if (speedKBps <= 0) return '0KB/s';
+    
+    if (speedKBps >= 1024) {
+      // 大于等于1MB/s，显示为MB/s
+      final speedMBps = speedKBps / 1024;
+      return '${speedMBps.toStringAsFixed(1)}MB/s';
+    } else {
+      // 小于1MB/s，显示为KB/s
+      return '${speedKBps.toStringAsFixed(1)}KB/s';
+    }
+  }
+
 
   /// 释放资源
   void dispose() {
