@@ -134,7 +134,7 @@ class VideoCard extends StatelessWidget {
                     ),
                 ),
                 // 年份徽章（搜索模式和聚合模式）
-                if ((from == 'search' || from == 'agg') && videoInfo.year.isNotEmpty)
+                if ((from == 'search' || from == 'agg') && videoInfo.year.isNotEmpty && videoInfo.year != 'unknown')
                   Positioned(
                     top: 4,
                     left: 4,

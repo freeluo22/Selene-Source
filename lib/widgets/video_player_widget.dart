@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:chewie/chewie.dart';
+import 'package:chewie/src/material/widgets/playback_speed_dialog.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
   final double aspectRatio;
   final VoidCallback? onBackPressed;
-  final Function(bool)? onFullscreenChange;
   final Function(VideoPlayerWidgetController)? onControllerCreated;
   final VoidCallback? onReady;
   final VoidCallback? onNextEpisode;
@@ -21,7 +21,6 @@ class VideoPlayerWidget extends StatefulWidget {
     required this.videoUrl,
     this.aspectRatio = 16 / 9,
     this.onBackPressed,
-    this.onFullscreenChange,
     this.onControllerCreated,
     this.onReady,
     this.onNextEpisode,
@@ -41,8 +40,8 @@ class VideoPlayerWidgetController {
   VideoPlayerWidgetController._(this._state);
   
   /// 动态更新视频播放 URL
-  Future<void> updateVideoUrl(String newVideoUrl) async {
-    await _state.updateVideoUrl(newVideoUrl);
+  Future<void> updateVideoUrl(String newVideoUrl, {Duration? startAt}) async {
+    await _state.updateVideoUrl(newVideoUrl, startAt: startAt);
   }
   
   /// 跳转到指定进度
@@ -95,6 +94,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   bool _isFullscreen = false;
   bool _hasCompleted = false; // 防止重复触发完成事件
   final List<VoidCallback> _progressListeners = []; // 进度监听器列表
+  double _cachedPlaybackSpeed = 1.0; // 暂存的播放速率
 
   @override
   void initState() {
@@ -103,10 +103,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     _setPortraitOrientation();
     // 创建控制器并通知父组件
     widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
-    // 延迟初始化控制器，避免在 initState 中访问 context
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeController();
-    });
   }
 
   // 设置竖屏方向
@@ -135,58 +131,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     ]);
   }
 
-  void _initializeController() async {
-    if (mounted) {
-      try {
-        _videoController = VideoPlayerController.networkUrl(
-          Uri.parse(widget.videoUrl),
-        );
-        
-        await _videoController!.initialize();
-        
-        if (mounted) {
-          _chewieController = ChewieController(
-            videoPlayerController: _videoController!,
-            autoPlay: true,
-            looping: false,
-            allowFullScreen: true,
-            allowMuting: true,
-            allowPlaybackSpeedChanging: true,
-            showOptions: true,
-            showControlsOnInitialize: true,
-            customControls: CustomChewieControls(
-              onBackPressed: widget.onBackPressed,
-              onFullscreenChange: _handleFullscreenChange,
-              onNextEpisode: widget.onNextEpisode,
-              onPause: widget.onPause,
-              onPlay: widget.onPlay,
-            ),
-          );
-          
-          // 添加视频播放完成监听
-          _videoController!.addListener(_onVideoStateChanged);
-          
-          setState(() {
-            _isInitialized = true;
-            _hasCompleted = false;
-          });
-          
-          // 触发 ready 事件
-          widget.onReady?.call();
-        }
-      } catch (e) {
-        debugPrint('Error initializing video player: $e');
-      }
-    }
-  }
-
   /// 动态更新视频播放 URL
   /// [newVideoUrl] 新的视频 URL
-  Future<void> updateVideoUrl(String newVideoUrl) async {
+  /// [startAt] 开始播放时间，如果提供则从指定时间开始播放
+  Future<void> updateVideoUrl(String newVideoUrl, {Duration? startAt}) async {
     if (!mounted) return;
+    if (newVideoUrl.isEmpty) return;
     
-    // 保存当前全屏状态
+    // 保存当前全屏状态和播放速率
     final wasFullscreen = _isFullscreen;
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      _cachedPlaybackSpeed = _videoController!.value.playbackSpeed;
+    }
     
     // 如果当前在全屏状态，先退出全屏
     if (wasFullscreen && _chewieController != null) {
@@ -225,6 +181,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           allowPlaybackSpeedChanging: true,
           showOptions: true,
           showControlsOnInitialize: true,
+          startAt: startAt,
           customControls: CustomChewieControls(
             onBackPressed: widget.onBackPressed,
             onFullscreenChange: _handleFullscreenChange,
@@ -233,6 +190,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             onPlay: widget.onPlay,
           ),
         );
+
+        // 恢复播放速率
+        _videoController!.setPlaybackSpeed(_cachedPlaybackSpeed);
         
         // 添加视频播放完成监听
         _videoController!.addListener(_onVideoStateChanged);
@@ -327,14 +287,34 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       // 根据全屏状态设置屏幕方向
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (isFullscreen) {
-          _setLandscapeOrientation();
+          // 进入全屏时根据视频分辨率判断屏幕方向
+          _setOrientationBasedOnVideo();
         } else {
+          // 退出全屏时强制进入竖屏
           _setPortraitOrientation();
         }
       });
-      
-      // 通知父组件全屏状态变化
-      widget.onFullscreenChange?.call(isFullscreen);
+    }
+  }
+
+  // 根据视频分辨率设置屏幕方向
+  void _setOrientationBasedOnVideo() {
+    if (_videoController == null || !_videoController!.value.isInitialized) {
+      // 如果视频未初始化，默认使用横屏
+      _setLandscapeOrientation();
+      return;
+    }
+
+    final videoSize = _videoController!.value.size;
+    final aspectRatio = videoSize.width / videoSize.height;
+    
+    // 判断是否为竖屏视频（宽高比小于1）
+    if (aspectRatio < 1.0) {
+      // 竖屏视频，设置竖屏方向
+      _setPortraitOrientation();
+    } else {
+      // 横屏视频，设置横屏方向
+      _setLandscapeOrientation();
     }
   }
 
@@ -402,7 +382,12 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
   @override
   void initState() {
     super.initState();
-    _startHideTimer();
+    // 延迟启动定时器，确保控制器已经初始化
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _forceStartHideTimer();
+      }
+    });
   }
 
   @override
@@ -420,6 +405,11 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     }
     
     _chewieController = chewieController;
+    
+    // 添加视频状态变化监听器
+    if (_chewieController != null) {
+      _chewieController!.videoPlayerController.addListener(_onVideoStateChanged);
+    }
   }
 
   void _onVideoStateChanged() {
@@ -449,6 +439,11 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
           });
         }
       }
+    }
+    
+    // 如果视频正在播放且控件可见但没有定时器在运行，启动定时器
+    if (isPlaying && _controlsVisible && _hideTimer == null) {
+      _startHideTimer();
     }
   }
 
@@ -504,6 +499,18 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
         }
       });
     }
+  }
+  
+  // 强制启动隐藏定时器（用于初始化时）
+  void _forceStartHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _controlsVisible = false;
+        });
+      }
+    });
   }
 
   void _onUserInteraction() {
@@ -823,18 +830,31 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                         Expanded(
                           child: _buildPositionIndicator(chewieController),
                         ),
-                        // // 设置按钮
-                        // IconButton(
-                        //   icon: Icon(
-                        //     Icons.settings,
-                        //     color: Colors.white,
-                        //     size: isFullscreen ? 22 : 20,
-                        //   ),
-                        //   onPressed: () {
-                        //     _onUserInteraction();
-                        //     // Handle settings
-                        //   },
-                        // ),
+                        // 倍速按钮
+                        IconButton(
+                          icon: Icon(
+                            Icons.speed,
+                            color: Colors.white,
+                            size: isFullscreen ? 22 : 20,
+                          ),
+                          onPressed: () async {
+                            _onUserInteraction();
+                            final videoController = chewieController.videoPlayerController;
+                            final chosenSpeed = await showModalBottomSheet<double>(
+                              context: context,
+                              isScrollControlled: true,
+                              useRootNavigator: chewieController.useRootNavigator,
+                              builder:
+                                  (context) => PlaybackSpeedDialog(
+                                    speeds: const [0.5, 0.75, 1.0, 1.5, 2.0, 3.0],
+                                    selected: videoController.value.playbackSpeed,
+                                  ),
+                            );
+                            if (chosenSpeed != null) {
+                              videoController.setPlaybackSpeed(chosenSpeed);
+                            }
+                          },
+                        ),
                         // 全屏按钮
                         GestureDetector(
                           onTap: () {

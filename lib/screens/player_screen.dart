@@ -82,17 +82,11 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   
   // 豆瓣详情数据
   DoubanMovieDetails? doubanDetails;
-
-  // 待恢复的进度
-  double resumeTime = 0;
   
   // 所有源信息
   List<SearchResult> allSources = [];
   // 所有源测速结果
   Map<String, SourceSpeed> allSourcesSpeed = {};
-
-  // 当前视频 URL
-  String _currentVideoUrl = '';
   
   // VideoPlayerWidget 的控制器
   VideoPlayerWidgetController? _videoPlayerController;
@@ -256,12 +250,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   void startPlay(int targetIndex, int playTime) {
     if (targetIndex >= currentDetail!.episodes.length) {
       targetIndex = 0;
-      resumeTime = 0;
       return;
     }
     currentEpisodeIndex = targetIndex;
-    resumeTime = playTime.toDouble();
-    updateVideoUrl(currentDetail!.episodes[targetIndex]);
+    // 将 playTime 转换为 Duration 并传递给 updateVideoUrl
+    final startAt = playTime > 0 ? Duration(seconds: playTime) : null;
+    updateVideoUrl(currentDetail!.episodes[targetIndex], startAt: startAt);
   }
 
   void setInfosByDetail(SearchResult detail) {
@@ -352,15 +346,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     }
     
     return result['bestSource'] as SearchResult;
-  }
-
-  // 处理全屏状态变化（简化版本，只用于UI状态更新）
-  void _handleFullscreenChange(bool isFullscreen) {
-    if (_isFullscreen != isFullscreen) {
-      setState(() {
-        _isFullscreen = isFullscreen;
-      });
-    }
   }
 
   // 处理返回按钮点击
@@ -503,12 +488,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   }
 
   /// 动态更新视频 URL
-  Future<void> updateVideoUrl(String newUrl) async {
+  Future<void> updateVideoUrl(String newUrl, {Duration? startAt}) async {
     try {
-      await _videoPlayerController?.updateVideoUrl(newUrl);
-      setState(() {
-        _currentVideoUrl = newUrl;
-      });
+      await _videoPlayerController?.updateVideoUrl(newUrl, startAt: startAt);
     } catch (e) {
       // 静默处理错误
     }
@@ -552,14 +534,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       // 隐藏切换加载蒙版
       _showSwitchLoadingOverlay = false;
     });
-    
-    // 如果有需要恢复的播放进度，则跳转到指定位置
-    if (resumeTime > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        seekToSeconds(resumeTime);
-        resumeTime = 0;
-      });
-    }
     
     // 重置最后保存时间，允许立即保存
     _lastSaveTime = null;
@@ -931,7 +905,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 const SizedBox(width: 12),
                 
                 // 年份
-                if (videoYear.isNotEmpty)
+                if (videoYear.isNotEmpty && videoYear != 'unknown')
                   Text(
                     videoYear,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -940,7 +914,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                     ),
                   ),
                 
-                if (videoYear.isNotEmpty)
+                if (videoYear.isNotEmpty && videoYear != 'unknown')
                   const SizedBox(width: 12),
                 
                 // 分类信息（绿色文字样式）
@@ -1600,6 +1574,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         child: Stack(
                           children: [
                             // 右上角集数信息
+                            if (source.episodes.length > 1)
                             Positioned(
                               top: 4,
                               right: 6,
@@ -2119,10 +2094,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 Stack(
                   children: [
                     VideoPlayerWidget(
-                      videoUrl: _currentVideoUrl,
+                      videoUrl: '',
                       aspectRatio: 16 / 9,
                       onBackPressed: _onBackPressed,
-                      onFullscreenChange: _handleFullscreenChange,
                       onControllerCreated: (controller) {
                         _videoPlayerController = controller;
                       },
@@ -3341,6 +3315,7 @@ class _SourcesGridPanelState extends State<_SourcesGridPanel> with SingleTickerP
                                           ),
                                       ],
                                       const Spacer(),
+                                      if (source.episodes.length > 1)
                                       Text(
                                         '${source.episodes.length} 集',
                                         style: widget.theme.textTheme.bodyMedium,
