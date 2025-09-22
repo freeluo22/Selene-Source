@@ -887,7 +887,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     );
   }
 
-
   Widget _buildPositionIndicator(ChewieController chewieController) {
     final videoPlayerController = chewieController.videoPlayerController;
     

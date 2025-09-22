@@ -54,7 +54,6 @@ class SourceSpeed {
 class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   late SystemUiOverlayStyle _originalStyle;
   bool _isInitialized = false;
-  bool _isFullscreen = false;
   String? _errorMessage;
   bool _showError = false;
 
