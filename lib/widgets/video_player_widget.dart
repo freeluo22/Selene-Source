@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:chewie/chewie.dart';
+// ignore: implementation_imports
 import 'package:chewie/src/material/widgets/playback_speed_dialog.dart';
 import 'package:video_player/video_player.dart';
-import 'package:pip/pip.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
@@ -16,7 +15,6 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onNextEpisode;
   final VoidCallback? onVideoCompleted;
   final VoidCallback? onPause;
-  final VoidCallback? onPlay;
 
   const VideoPlayerWidget({
     super.key,
@@ -28,7 +26,6 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onNextEpisode,
     this.onVideoCompleted,
     this.onPause,
-    this.onPlay,
   });
 
   @override
@@ -82,21 +79,6 @@ class VideoPlayerWidgetController {
     _state._removeProgressListener(listener);
   }
 
-  /// 启动 PiP 模式
-  Future<void> startPip() async {
-    await _state._startPip();
-  }
-
-  /// 停止 PiP 模式
-  Future<void> stopPip() async {
-    await _state._stopPip();
-  }
-
-  /// 检查是否支持 PiP
-  bool get isPipSupported => _state._isPipSupported;
-
-  /// 检查 PiP 是否激活
-  bool get isPipActive => _state._isPipActive;
 
   /// 销毁播放器资源
   void dispose() {
@@ -114,12 +96,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with WidgetsBindi
   final List<VoidCallback> _progressListeners = []; // 进度监听器列表
   double _cachedPlaybackSpeed = 1.0; // 暂存的播放速率
   
-  // PiP 相关
-  final Pip _pip = Pip();
-  bool _isPipSupported = false;
-  bool _isPipActive = false;
-  final ValueNotifier<bool> _pipStateNotifier = ValueNotifier<bool>(false);
-  
 
   @override
   void initState() {
@@ -129,9 +105,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with WidgetsBindi
     
     // 设置初始屏幕方向为竖屏 
     _setPortraitOrientation();
-    
-    // 初始化 PiP 功能
-    _initializePip();
     
     // 创建控制器并通知父组件
     widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
@@ -163,120 +136,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with WidgetsBindi
     ]);
   }
 
-  // 初始化 PiP 功能
-  Future<void> _initializePip() async {
-    try {
-      // 检查设备是否支持 PiP
-      _isPipSupported = await _pip.isSupported();
-
-      if (Platform.isIOS) {
-        _isPipSupported = false;
-      }
-
-      debugPrint('PiP supported: $_isPipSupported');
-      
-      if (_isPipSupported) {
-        // 注册 PiP 状态变化监听器
-        await _pip.registerStateChangedObserver(
-          PipStateChangedObserver(
-            onPipStateChanged: (state, error) {
-              if (!mounted) return;
-              
-              setState(() {
-                switch (state) {
-                  case PipState.pipStateStarted:
-                    _isPipActive = true;
-                    _pipStateNotifier.value = true;
-                    break;
-                  case PipState.pipStateStopped:
-                    _isPipActive = false;
-                    _pipStateNotifier.value = false;
-                    break;
-                  case PipState.pipStateFailed:
-                    _isPipActive = false;
-                    _pipStateNotifier.value = false;
-                    debugPrint('PiP failed: $error');
-                    break;
-                }
-              });
-            },
-          ),
-        );
-        
-        // 配置 PiP 选项
-        await _setupPipOptions();
-      }
-    } catch (e) {
-      debugPrint('Error initializing PiP: $e');
-    }
-  }
-
-  // 设置 PiP 选项
-  Future<void> _setupPipOptions() async {
-    try {
-      PipOptions options;
-      
-      if (Platform.isAndroid) {
-        options = PipOptions(
-          autoEnterEnabled: true,
-          aspectRatioX: 16,
-          aspectRatioY: 9,
-          sourceRectHintLeft: 0,
-          sourceRectHintTop: 0,
-          sourceRectHintRight: 1080,
-          sourceRectHintBottom: 720,
-          seamlessResizeEnabled: true,
-        );
-      } else if (Platform.isIOS) {
-        options = PipOptions(
-          autoEnterEnabled: true,
-          preferredContentWidth: 480,
-          preferredContentHeight: 270,
-          controlStyle: 2, // 隐藏播放暂停按钮和进度条
-        );
-      } else {
-        options = PipOptions(
-          autoEnterEnabled: true,
-        );
-      }
-      
-      await _pip.setup(options);
-    } catch (e) {
-      debugPrint('Error setting up PiP options: $e');
-    }
-  }
-
-  // 启动 PiP 模式
-  Future<void> _startPip() async {
-    if (!_isPipSupported || _isPipActive || _videoController == null || !_videoController!.value.isInitialized) {
-      return;
-    }
-    
-    try {
-      // 在进入 PiP 前强制开始播放
-      if (!_videoController!.value.isPlaying) {
-        await _videoController!.play();
-      }
-      
-      final success = await _pip.start();
-      if (!success) {
-        debugPrint('Failed to start PiP mode');
-      }
-    } catch (e) {
-      debugPrint('Error starting PiP: $e');
-    }
-  }
-
-  // 停止 PiP 模式
-  Future<void> _stopPip() async {
-    if (!_isPipActive) return;
-    
-    try {
-      await _pip.stop();
-    } catch (e) {
-      debugPrint('Error stopping PiP: $e');
-    }
-  }
 
   /// 动态更新视频播放 URL
   /// [newVideoUrl] 新的视频 URL
@@ -329,14 +188,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with WidgetsBindi
           showOptions: true,
           showControlsOnInitialize: true,
           startAt: startAt,
+          allowedScreenSleep: false,
           customControls: CustomChewieControls(
             onBackPressed: widget.onBackPressed,
             onFullscreenChange: _handleFullscreenChange,
             onNextEpisode: widget.onNextEpisode,
             onPause: widget.onPause,
-            onPlay: widget.onPlay,
             playerController: VideoPlayerWidgetController._(this),
-            pipStateNotifier: _pipStateNotifier,
           ),
         );
 
@@ -468,54 +326,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with WidgetsBindi
     }
   }
 
-  // 应用生命周期变化处理
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    
-    if (!_isPipSupported || _videoController == null || !_videoController!.value.isInitialized) {
-      return;
-    }
-    
-    switch (state) {
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.paused:
-        // 应用进入后台时启动 PiP（如果视频正在播放）
-        if (_videoController!.value.isPlaying && !_isPipActive) {
-          _startPip();
-        }
-        break;
-      case AppLifecycleState.resumed:
-        // 应用回到前台时停止 PiP
-        if (_isPipActive) {
-          _stopPip();
-        }
-        break;
-      case AppLifecycleState.detached:
-        // 应用被销毁时停止 PiP
-        if (_isPipActive) {
-          _stopPip();
-        }
-        break;
-      case AppLifecycleState.hidden:
-        break;
-    }
-  }
-
   @override
   void dispose() {
     // 移除应用生命周期观察者
     WidgetsBinding.instance.removeObserver(this);
-    
-    // 停止 PiP 并释放资源
-    if (_isPipActive) {
-      _stopPip();
-    }
-    _pip.unregisterStateChangedObserver();
-    _pip.dispose();
-    
-    // 释放 ValueNotifier
-    _pipStateNotifier.dispose();
     
     // 恢复屏幕方向为自动
     _restoreOrientation();
@@ -551,9 +365,7 @@ class CustomChewieControls extends StatefulWidget {
   final Function(bool) onFullscreenChange;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPause;
-  final VoidCallback? onPlay;
   final VideoPlayerWidgetController? playerController;
-  final ValueNotifier<bool>? pipStateNotifier;
 
   const CustomChewieControls({
     super.key,
@@ -561,9 +373,7 @@ class CustomChewieControls extends StatefulWidget {
     required this.onFullscreenChange,
     this.onNextEpisode,
     this.onPause,
-    this.onPlay,
     this.playerController,
-    this.pipStateNotifier,
   });
 
   @override
@@ -583,8 +393,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
   @override
   void initState() {
     super.initState();
-    // 监听 PiP 状态变化
-    widget.pipStateNotifier?.addListener(_onPipStateChanged);
     // 延迟启动定时器，确保控制器已经初始化
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -687,8 +495,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    // 移除 PiP 状态监听器
-    widget.pipStateNotifier?.removeListener(_onPipStateChanged);
     super.dispose();
   }
 
@@ -768,27 +574,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     _startHideTimer();
   }
 
-  /// 处理 PiP 状态变化
-  void _onPipStateChanged() {
-    if (!mounted) return;
-    
-    final isPipActive = widget.pipStateNotifier?.value ?? false;
-    if (isPipActive) {
-      // 进入 PiP 时隐藏控件
-      setState(() {
-        _controlsVisible = false;
-      });
-      _hideTimer?.cancel();
-    } else {
-      // 退出 PiP 时显示控件
-      setState(() {
-        _controlsVisible = true;
-      });
-      _startHideTimer();
-    }
-  }
-
-
   // 退出全屏
   void _exitFullscreen() {
     // 检查widget是否仍然mounted
@@ -842,9 +627,9 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.5), // 顶部黑色
+                        Colors.black.withValues(alpha: 0.5), // 顶部黑色
                         Colors.transparent, // 中间无色
-                        Colors.black.withOpacity(0.1), // 底部黑色
+                        Colors.black.withValues(alpha: 0.1), // 底部黑色
                       ],
                       stops: const [0.0, 0.5, 1.0], // 控制渐变位置
                     ),
@@ -920,7 +705,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                             widget.onPause?.call();
                           } else {
                             chewieController.play();
-                            widget.onPlay?.call();
                           }
                         },
                         child: AnimatedBuilder(
@@ -955,7 +739,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                   colors: ChewieProgressColors(
                     playedColor: Colors.red,
                     handleColor: Colors.red,
-                    backgroundColor: Colors.white.withOpacity(0.3),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                     bufferedColor: Colors.transparent,
                   ),
                   onDragStart: _onSeekStart,
@@ -991,7 +775,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withOpacity(0.7),
+                        Colors.black.withValues(alpha: 0.7),
                       ],
                     ),
                   ),
@@ -1013,7 +797,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                               widget.onPause?.call();
                             } else {
                               chewieController.play();
-                              widget.onPlay?.call();
                             }
                           },
                           behavior: HitTestBehavior.opaque,
@@ -1056,27 +839,6 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                         Expanded(
                           child: _buildPositionIndicator(chewieController),
                         ),
-                        // PiP button
-                        if (widget.playerController?.isPipSupported == true)
-                          IconButton(
-                            icon: Icon(
-                              widget.playerController?.isPipActive == true 
-                                  ? Icons.picture_in_picture_alt_outlined 
-                                  : Icons.picture_in_picture_alt,
-                              color: widget.playerController?.isPipActive == true 
-                                  ? Colors.red 
-                                  : Colors.white,
-                              size: isFullscreen ? 22 : 20,
-                            ),
-                            onPressed: () async {
-                              _onUserInteraction();
-                              if (widget.playerController?.isPipActive == true) {
-                                await widget.playerController?.stopPip();
-                              } else {
-                                await widget.playerController?.startPip();
-                              }
-                            },
-                          ),
                         // 倍速按钮
                         IconButton(
                           icon: Icon(
