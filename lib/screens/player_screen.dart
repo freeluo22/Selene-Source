@@ -694,29 +694,36 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   /// 执行滚动到当前源的具体逻辑
   void _performScrollToCurrentSource() {
     if (currentDetail == null || !_sourcesScrollController.hasClients) return;
-    
+
     // 找到当前源在allSources中的索引
     final currentSourceIndex = allSources.indexWhere(
       (source) => source.source == currentSource && source.id == currentID
     );
-    
+
     if (currentSourceIndex == -1) return;
-    
+
     // 动态计算卡片宽度
     final screenWidth = MediaQuery.of(context).size.width;
-    final horizontalPadding = 32.0;
-    final availableWidth = screenWidth - horizontalPadding;
-    final cardWidth = (availableWidth / 3.2) - 6;
-    final itemWidth = cardWidth + 6; // 卡片宽度 + 右边距
-    
-    // 计算选中项在屏幕中央的偏移量
-    final centerOffset = (screenWidth - horizontalPadding) / 2 - cardWidth / 2;
-    final targetOffset = (currentSourceIndex * itemWidth) - centerOffset;
-    
+    const listViewPadding = 16.0; // ListView的左右padding
+    const itemMargin = 6.0; // 每个item的右边距
+    final availableWidth = screenWidth - (listViewPadding * 2); // 减去左右padding
+    final cardWidth = (availableWidth / 3.2) - itemMargin; // 减去右边距
+
+    // 计算选中项在可视区域中央的偏移量
+    // 可视区域中心 = (屏幕宽度 - ListView左右padding) / 2
+    // 选中项应该位于这个中心位置
+    final visibleAreaWidth = screenWidth - (listViewPadding * 2);
+    final visibleCenter = visibleAreaWidth / 2;
+    final itemCenter = cardWidth / 2;
+
+    // 计算需要滚动的距离，使选中项的中心对准可视区域的中心
+    // 注意：要减去第一个item的左边距（因为ListView有左padding）
+    final targetOffset = (currentSourceIndex * (cardWidth + itemMargin)) - (visibleCenter - itemCenter - listViewPadding);
+
     // 确保不滚动到负值或超出范围
     final maxScrollExtent = _sourcesScrollController.position.maxScrollExtent;
     final clampedOffset = targetOffset.clamp(0.0, maxScrollExtent);
-    
+
     _sourcesScrollController.animateTo(
       clampedOffset,
       duration: const Duration(milliseconds: 300),
@@ -786,26 +793,33 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   /// 执行滚动到当前集数的具体逻辑
   void _performScrollToCurrentEpisode() {
     if (currentDetail == null || !_episodesScrollController.hasClients) return;
-    
+
     // 动态计算按钮宽度
     final screenWidth = MediaQuery.of(context).size.width;
-    final horizontalPadding = 32.0;
-    final availableWidth = screenWidth - horizontalPadding;
-    final buttonWidth = (availableWidth / 3.2) - 6; // 减去右边距6
-    
-    final targetIndex = _isEpisodesReversed 
-        ? currentDetail!.episodes.length - 1 - currentEpisodeIndex 
+    const listViewPadding = 16.0; // ListView的左右padding
+    const itemMargin = 6.0; // 每个item的右边距
+    final availableWidth = screenWidth - (listViewPadding * 2); // 减去左右padding
+    final buttonWidth = (availableWidth / 3.2) - itemMargin; // 减去右边距
+
+    final targetIndex = _isEpisodesReversed
+        ? currentDetail!.episodes.length - 1 - currentEpisodeIndex
         : currentEpisodeIndex;
-    
-    // 计算选中项在屏幕中央的偏移量
-    // 屏幕宽度的一半减去按钮宽度的一半，让选中项居中
-    final centerOffset = (screenWidth - horizontalPadding) / 2 - buttonWidth / 2;
-    final targetOffset = (targetIndex * buttonWidth) - centerOffset;
-    
+
+    // 计算选中项在可视区域中央的偏移量
+    // 可视区域中心 = (屏幕宽度 - ListView左右padding) / 2
+    // 选中项应该位于这个中心位置
+    final visibleAreaWidth = screenWidth - (listViewPadding * 2);
+    final visibleCenter = visibleAreaWidth / 2;
+    final itemCenter = buttonWidth / 2;
+
+    // 计算需要滚动的距离，使选中项的中心对准可视区域的中心
+    // 注意：要减去第一个item的左边距（因为ListView有左padding）
+    final targetOffset = (targetIndex * (buttonWidth + itemMargin)) - (visibleCenter - itemCenter - listViewPadding);
+
     // 确保不滚动到负值或超出范围
     final maxScrollExtent = _episodesScrollController.position.maxScrollExtent;
     final clampedOffset = targetOffset.clamp(0.0, maxScrollExtent);
-    
+
     _episodesScrollController.animateTo(
       clampedOffset,
       duration: const Duration(milliseconds: 300),
