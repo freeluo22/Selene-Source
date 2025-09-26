@@ -117,6 +117,7 @@ class VideoMenuBottomSheet extends StatefulWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5), // 添加半透明的遮罩层
       transitionAnimationController: AnimationController(
@@ -492,13 +493,6 @@ class _VideoMenuBottomSheetState extends State<VideoMenuBottomSheet>
                       return;
                     }
                   } else {
-                    // 非iOS或非收起阶段的正常逻辑
-                    // 下拉超过阈值则关闭
-                    if (newHeight < _initialSheetHeight! - _dismissDragThreshold) {
-                      widget.onClose();
-                      return;
-                    }
-
                     // 使用高效的拖拽高度更新
                     _updateDragHeight(newHeight, effectiveMaxHeight, isDraggingDown);
                   }
