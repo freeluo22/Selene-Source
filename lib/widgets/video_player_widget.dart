@@ -7,6 +7,7 @@ import 'package:chewie/chewie.dart';
 import 'package:chewie/src/material/widgets/playback_speed_dialog.dart';
 import 'package:chewie/src/progress_bar.dart';
 import 'package:video_player/video_player.dart';
+import 'dlna_device_dialog.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
@@ -481,7 +482,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
       _isLongPressing = true;
       _originalPlaybackSpeed =
           chewieController.videoPlayerController.value.playbackSpeed;
-      chewieController.videoPlayerController.setPlaybackSpeed(3.0);
+      chewieController.videoPlayerController.setPlaybackSpeed(2.0);
     });
   }
 
@@ -666,6 +667,38 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     widget.onFullscreenChange(false);
   }
 
+  // 显示DLNA设备选择对话框
+  Future<void> _showDLNADialog() async {
+    // 如果当前正在播放，先暂停
+    if (_chewieController?.videoPlayerController.value.isPlaying == true) {
+      _chewieController?.pause();
+      widget.onPause?.call();
+    }
+
+    // 如果当前是全屏状态，先退出全屏并等待完成
+    if (_chewieController?.isFullScreen == true) {
+      _exitFullscreen();
+      
+      // 等待退出全屏完成，轮询检查状态
+      int attempts = 0;
+      const maxAttempts = 20; // 最多等待2秒
+      while (mounted && 
+             _chewieController?.isFullScreen == true && 
+             attempts < maxAttempts) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        attempts++;
+      }
+    }
+
+    // 确保widget仍然mounted且不在全屏状态
+    if (mounted && _chewieController?.isFullScreen != true) {
+      await showDialog(
+        context: context,
+        builder: (context) => const DLNADeviceDialog(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final chewieController = ChewieController.of(context);
@@ -737,6 +770,27 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                   padding: const EdgeInsets.all(8),
                   child: Icon(
                     Icons.arrow_back,
+                    color: Colors.white,
+                    size: isFullscreen ? 24 : 20,
+                  ),
+                ),
+              ),
+            ),
+          // DLNA投屏按钮
+          if (_controlsVisible)
+            Positioned(
+              top: isFullscreen ? 8 : 4,
+              right: isFullscreen ? 16.0 : 8.0,
+              child: GestureDetector(
+                onTap: () async {
+                  _onUserInteraction();
+                  await _showDLNADialog();
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.cast,
                     color: Colors.white,
                     size: isFullscreen ? 24 : 20,
                   ),
@@ -995,7 +1049,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    '3x',
+                    '2x',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,
