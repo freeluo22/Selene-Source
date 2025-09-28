@@ -6,7 +6,9 @@ import 'package:chewie/chewie.dart';
 // ignore: implementation_imports
 import 'package:chewie/src/material/widgets/playback_speed_dialog.dart';
 import 'package:chewie/src/progress_bar.dart';
+import 'package:fvp/fvp.dart';
 import 'package:video_player/video_player.dart';
+import 'package:dlna_dart/dlna.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
@@ -190,6 +192,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
           startAt: startAt,
           allowedScreenSleep: false,
           customControls: CustomChewieControls(
+            videoUrl: newVideoUrl,
             onBackPressed: widget.onBackPressed,
             onFullscreenChange: _handleFullscreenChange,
             onNextEpisode: widget.onNextEpisode,
@@ -366,6 +369,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 }
 
 class CustomChewieControls extends StatefulWidget {
+  final String videoUrl;
   final VoidCallback? onBackPressed;
   final Function(bool) onFullscreenChange;
   final VoidCallback? onNextEpisode;
@@ -374,6 +378,7 @@ class CustomChewieControls extends StatefulWidget {
 
   const CustomChewieControls({
     super.key,
+    required this.videoUrl,
     this.onBackPressed,
     required this.onFullscreenChange,
     this.onNextEpisode,
@@ -398,6 +403,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
   bool _isSeekingViaSwipe = false; // 是否正在通过滑动进行seek
   double _swipeStartX = 0; // 滑动开始时的X坐标
   Duration _swipeStartPosition = Duration.zero; // 滑动开始时的播放位置
+  List<DLNADevice> _dlnaDevices = [];
 
   @override
   void initState() {
@@ -406,6 +412,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _forceStartHideTimer();
+        _start_search_dlna_devices();
       }
     });
   }
@@ -590,14 +597,16 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     if (!mounted) return;
 
     final chewieController = _chewieController;
-    if (chewieController == null || !chewieController.videoPlayerController.value.isInitialized) {
+    if (chewieController == null ||
+        !chewieController.videoPlayerController.value.isInitialized) {
       return;
     }
 
     setState(() {
       _isSeekingViaSwipe = true;
       _swipeStartX = details.globalPosition.dx;
-      _swipeStartPosition = chewieController.videoPlayerController.value.position;
+      _swipeStartPosition =
+          chewieController.videoPlayerController.value.position;
       _controlsVisible = true; // 显示控件
     });
 
@@ -609,7 +618,8 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     if (!mounted || !_isSeekingViaSwipe) return;
 
     final chewieController = _chewieController;
-    if (chewieController == null || !chewieController.videoPlayerController.value.isInitialized) {
+    if (chewieController == null ||
+        !chewieController.videoPlayerController.value.isInitialized) {
       return;
     }
 
@@ -621,8 +631,12 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     final duration = chewieController.videoPlayerController.value.duration;
 
     // 计算目标位置
-    final targetPosition = _swipeStartPosition + Duration(milliseconds: (duration.inMilliseconds * swipeRatio * 0.1).round());
-    final clampedPosition = Duration(milliseconds: targetPosition.inMilliseconds.clamp(0, duration.inMilliseconds));
+    final targetPosition = _swipeStartPosition +
+        Duration(
+            milliseconds: (duration.inMilliseconds * swipeRatio * 0.1).round());
+    final clampedPosition = Duration(
+        milliseconds:
+            targetPosition.inMilliseconds.clamp(0, duration.inMilliseconds));
 
     setState(() {
       _dragPosition = clampedPosition; // 更新拖动位置显示
@@ -634,7 +648,8 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
     if (!mounted || !_isSeekingViaSwipe) return;
 
     final chewieController = _chewieController;
-    if (chewieController == null || !chewieController.videoPlayerController.value.isInitialized) {
+    if (chewieController == null ||
+        !chewieController.videoPlayerController.value.isInitialized) {
       setState(() {
         _isSeekingViaSwipe = false;
       });
@@ -664,6 +679,34 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
 
     // 通知父组件全屏状态变化
     widget.onFullscreenChange(false);
+  }
+
+  _start_search_dlna_devices() async {
+    final searcher = DLNAManager();
+    searcher.start().then((m) {
+      m.devices.stream.listen((deviceList) {
+        deviceList.forEach((key, value) async {
+          print(key);
+          if (value.info.friendlyName.contains('Wireless')) return;
+          print(value.info.friendlyName);
+          print(value.activeTime);
+          print(value.info.serviceList);
+          print('\r\n');
+          final text = await value.position();
+          final r = await value.seekByCurrent(text, 10);
+          print(r);
+        });
+
+        _dlnaDevices = deviceList.values.toList();
+        setState(() {});
+      });
+    });
+
+    // close the server,the closed server can be start by call searcher.start()
+    Timer(Duration(seconds: 30), () {
+      searcher.stop();
+      print('server closed');
+    });
   }
 
   @override
@@ -711,8 +754,7 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
               child: GestureDetector(
                 onTap: _onBlankAreaTap,
                 child: Container(
-                  decoration: BoxDecoration(
-                  ),
+                  decoration: BoxDecoration(),
                 ),
               ),
             ),
@@ -898,6 +940,70 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
                         Expanded(
                           child: _buildPositionIndicator(chewieController),
                         ),
+                        if (!isFullscreen)
+                          IconButton(
+                            onPressed: () {
+                              showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  enableDrag: false,
+                                  backgroundColor: Colors.transparent,
+                                  barrierColor:
+                                      Colors.white.withValues(alpha: 0.5),
+                                  // 添加半透明的遮罩层
+                                  transitionAnimationController:
+                                      AnimationController(
+                                    duration: const Duration(milliseconds: 200),
+                                    // 缩短动画时间到200ms
+                                    vsync: Navigator.of(context),
+                                  ),
+                                  builder: (context) {
+                                    return Container(
+                                      height: 500,
+                                      color: Colors.white,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.vertical,
+                                        itemCount: _dlnaDevices.length,
+                                        itemBuilder: (context, idx) {
+                                          DLNADevice device = _dlnaDevices[idx];
+                                          return SizedBox(
+                                            width: double.infinity,
+                                            child: Container(
+                                              // width: double.infinity,
+                                              height: 100,
+                                              // color: Colors.green,
+                                              padding: EdgeInsets.fromLTRB(
+                                                  5, 5, 5, 5),
+                                              child: Column(
+                                                children: [
+                                                  Text(
+                                                      "名称：${device.info.friendlyName}"),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      print("tt tap");
+                                                      print(widget.videoUrl);
+                                                      device.setUrl(
+                                                          widget.videoUrl);
+
+                                                      device.play();
+                                                    },
+                                                    child: Text("投屏"),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  });
+                            },
+                            icon: Icon(
+                              Icons.airplay,
+                              color: Colors.white,
+                              size: isFullscreen ? 22 : 20,
+                            ),
+                          ),
                         // 倍速按钮
                         IconButton(
                           icon: Icon(
@@ -1023,7 +1129,8 @@ class _CustomChewieControlsState extends State<CustomChewieControls> {
       animation: videoPlayerController,
       builder: (context, child) {
         // 如果有拖动位置，使用拖动位置，否则使用当前播放位置
-        final currentPosition = _dragPosition ?? videoPlayerController.value.position;
+        final currentPosition =
+            _dragPosition ?? videoPlayerController.value.position;
         final totalDuration = videoPlayerController.value.duration;
 
         return Text(
@@ -1105,7 +1212,8 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
   }
 
   void _seekToRelativePosition(Offset globalPosition) {
-    final position = context.calculateRelativePosition(controller.value.duration, globalPosition);
+    final position = context.calculateRelativePosition(
+        controller.value.duration, globalPosition);
     controller.seekTo(position);
   }
 
@@ -1147,7 +1255,8 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
               _latestDraggableOffset = details.globalPosition;
 
               // 计算当前拖动位置并通知外部
-              final dragPosition = context.calculateRelativePosition(controller.value.duration, details.globalPosition);
+              final dragPosition = context.calculateRelativePosition(
+                  controller.value.duration, details.globalPosition);
               widget.onPositionUpdate?.call(dragPosition);
 
               listener();
@@ -1178,7 +1287,8 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
 }
 
 extension RelativePositionExtensions on BuildContext {
-  Duration calculateRelativePosition(Duration videoDuration, Offset globalPosition) {
+  Duration calculateRelativePosition(
+      Duration videoDuration, Offset globalPosition) {
     final box = findRenderObject()! as RenderBox;
     final Offset tapPos = box.globalToLocal(globalPosition);
     final double relative = (tapPos.dx / box.size.width).clamp(0, 1);
