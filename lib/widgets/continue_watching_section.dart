@@ -112,18 +112,42 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   }
 
   void _scrollLeft() {
+    if (!_scrollController.hasClients) return;
+    
+    // 根据可见卡片数动态计算滚动距离
+    final double visibleCards = DeviceUtils.getHorizontalVisibleCards(context, 2.75);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    const double padding = 32.0;
+    const double spacing = 12.0;
+    final double availableWidth = screenWidth - padding;
+    final double cardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+    // 每次滚动约 5 个卡片的距离
+    final double scrollDistance = (cardWidth + spacing) * 5;
+    
     _scrollController.animateTo(
-      math.max(0, _scrollController.offset - 1000),
+      math.max(0, _scrollController.offset - scrollDistance),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
   }
 
   void _scrollRight() {
+    if (!_scrollController.hasClients) return;
+    
+    // 根据可见卡片数动态计算滚动距离
+    final double visibleCards = DeviceUtils.getHorizontalVisibleCards(context, 2.75);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    const double padding = 32.0;
+    const double spacing = 12.0;
+    final double availableWidth = screenWidth - padding;
+    final double cardWidth = (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+    // 每次滚动约 5 个卡片的距离
+    final double scrollDistance = (cardWidth + spacing) * 5;
+    
     _scrollController.animateTo(
       math.min(
         _scrollController.position.maxScrollExtent,
-        _scrollController.offset + 1000,
+        _scrollController.offset + scrollDistance,
       ),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -635,9 +659,8 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   Widget _buildContent() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTablet = DeviceUtils.isTablet(context);
-        // 平板模式显示 5.75个卡片，手机模式显示2.75个卡片
-        final double visibleCards = isTablet ? 5.75 : 2.75;
+        // 根据宽度动态展示卡片数：平板模式 5.75/6.75/7.75，手机模式 2.75
+        final double visibleCards = DeviceUtils.getHorizontalVisibleCards(context, 2.75);
 
         // 计算卡片宽度
         final double screenWidth = constraints.maxWidth;
@@ -687,10 +710,10 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   Widget _buildLoadingState() {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 根据宽度动态展示卡片数：平板模式 5.75/6.75/7.75，手机模式 2.75
+        final double visibleCards = DeviceUtils.getHorizontalVisibleCards(context, 2.75);
         final isTablet = DeviceUtils.isTablet(context);
-        // 平板模式显示5.75个卡片，手机模式显示2.75个卡片
-        final double visibleCards = isTablet ? 5.75 : 2.75;
-        final int skeletonCount = isTablet ? 6 : 3; // 骨架卡片数量
+        final int skeletonCount = isTablet ? visibleCards.ceil() : 3; // 骨架卡片数量
 
         // 计算卡片宽度
         final double screenWidth = constraints.maxWidth;

@@ -276,9 +276,9 @@ class _FavoritesGridState extends State<FavoritesGrid>
       color: const Color(0xFF27ae60),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          // 平板模式根据宽度动态展示6～9列，手机模式3列
+          final int crossAxisCount = DeviceUtils.getTabletColumnCount(context);
           final isTablet = DeviceUtils.isTablet(context);
-          // 平板模式6列，手机模式3列
-          final int crossAxisCount = isTablet ? 6 : 3;
 
           // 计算每列的宽度
           final double screenWidth = constraints.maxWidth;
@@ -303,7 +303,7 @@ class _FavoritesGridState extends State<FavoritesGrid>
               crossAxisSpacing: spacing, // 列间距
               mainAxisSpacing: isTablet ? 0 : 16, // 行间距
             ),
-            itemCount: isTablet ? 12 : 6, // 平板显示12个，手机显示6个骨架卡片
+            itemCount: isTablet ? crossAxisCount * 2 : 6, // 平板显示2行，手机显示6个骨架卡片
             itemBuilder: (context, index) {
               return _buildSkeletonCard(itemWidth);
             },
@@ -437,9 +437,9 @@ class _FavoritesGridState extends State<FavoritesGrid>
       color: const Color(0xFF27ae60),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          // 平板模式根据宽度动态展示6～9列，手机模式3列
+          final int crossAxisCount = DeviceUtils.getTabletColumnCount(context);
           final isTablet = DeviceUtils.isTablet(context);
-          // 平板模式6列，手机模式3列
-          final int crossAxisCount = isTablet ? 6 : 3;
 
           // 计算每列的宽度
           final double screenWidth = constraints.maxWidth;

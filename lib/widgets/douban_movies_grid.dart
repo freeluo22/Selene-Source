@@ -46,9 +46,9 @@ class DoubanMoviesGrid extends StatelessWidget {
   Widget _buildLoadingState() {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 平板模式根据宽度动态展示6～9列，手机模式3列
+        final int crossAxisCount = DeviceUtils.getTabletColumnCount(context);
         final isTablet = DeviceUtils.isTablet(context);
-        // 平板模式6列，手机模式3列
-        final int crossAxisCount = isTablet ? 6 : 3;
         
         final double screenWidth = constraints.maxWidth;
         const double padding = 16.0;
@@ -69,7 +69,7 @@ class DoubanMoviesGrid extends StatelessWidget {
             crossAxisSpacing: spacing,
             mainAxisSpacing: isTablet ? 0 : 6,
           ),
-          itemCount: isTablet ? 12 : 6,
+          itemCount: isTablet ? crossAxisCount * 2 : 6, // 平板显示2行，手机显示6个骨架卡片
           itemBuilder: (context, index) {
             return _buildSkeletonCard(itemWidth);
           },
@@ -175,9 +175,9 @@ class DoubanMoviesGrid extends StatelessWidget {
   Widget _buildMoviesGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 平板模式根据宽度动态展示6～9列，手机模式3列
+        final int crossAxisCount = DeviceUtils.getTabletColumnCount(context);
         final isTablet = DeviceUtils.isTablet(context);
-        // 平板模式6列，手机模式3列
-        final int crossAxisCount = isTablet ? 6 : 3;
         
         final double screenWidth = constraints.maxWidth;
         const double padding = 16.0;

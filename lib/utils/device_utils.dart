@@ -48,4 +48,49 @@ class DeviceUtils {
   static bool isPC() {
     return isWindows() || isMacOS();
   }
+
+  /// 根据屏幕宽度动态计算平板模式下的列数（6～8列）
+  ///
+  /// 宽度范围：
+  /// - < 1000: 6列
+  /// - 1000-1200: 7列
+  /// - >= 1200: 8列
+  static int getTabletColumnCount(BuildContext context) {
+    if (!isTablet(context)) {
+      return 3; // 手机模式固定3列
+    }
+
+    final double width = MediaQuery.of(context).size.width;
+
+    if (width < 1000) {
+      return 6;
+    } else if (width < 1200) {
+      return 7;
+    } else {
+      return 8;
+    }
+  }
+
+  /// 根据屏幕宽度动态计算横向滚动列表的可见卡片数（5.75、6.75、7.75）
+  ///
+  /// 用于 continue_watching_section 和 recommendation_section
+  /// 宽度范围：
+  /// - < 1000: 5.75列
+  /// - 1000-1200: 6.75列
+  /// - >= 1200: 7.75列
+  static double getHorizontalVisibleCards(BuildContext context, double mobileCardCount) {
+    if (!isTablet(context)) {
+      return mobileCardCount; // 手机模式使用传入的卡片数
+    }
+
+    final double width = MediaQuery.of(context).size.width;
+
+    if (width < 1000) {
+      return 5.75;
+    } else if (width < 1200) {
+      return 6.75;
+    } else {
+      return 7.75;
+    }
+  }
 }

@@ -52,9 +52,9 @@ class _SearchResultsGridState extends State<SearchResultsGrid>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 根据设备类型确定列数和间距
+        // 平板模式根据宽度动态展示6～9列，手机模式3列
+        final int crossAxisCount = DeviceUtils.getTabletColumnCount(context);
         final bool isTablet = DeviceUtils.isTablet(context);
-        final int crossAxisCount = isTablet ? 6 : 3; // 平板6列，手机3列
         final double mainAxisSpacing = isTablet ? 0.0 : 16.0; // 平板行间距为0
         
         // 计算每列的宽度
