@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:awesome_video_player/awesome_video_player.dart';
-import 'video_player_widget.dart';
+import 'mobile_video_player_widget.dart';
 import 'dlna_device_dialog.dart';
 
 // LoadingVideoNotifier 已在 video_player_widget.dart 中定义，通过 import 引入
@@ -14,7 +14,7 @@ class CustomBetterPlayerControls extends StatefulWidget {
   final Function(bool) onFullscreenChange;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPause;
-  final VideoPlayerWidgetController? playerController;
+  final MobileVideoPlayerWidgetController? playerController;
   final String videoUrl;
   final bool isLastEpisode;
   final GlobalKey? betterPlayerKey;

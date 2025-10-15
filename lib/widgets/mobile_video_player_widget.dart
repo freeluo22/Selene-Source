@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:awesome_video_player/awesome_video_player.dart';
 import 'custom_better_player_controls.dart';
 
-class VideoPlayerWidget extends StatefulWidget {
-  final BetterPlayerDataSource? dataSource;
+class MobileVideoPlayerWidget extends StatefulWidget {
+  final String? url;
   final VoidCallback? onBackPressed;
-  final Function(VideoPlayerWidgetController)? onControllerCreated;
+  final Function(MobileVideoPlayerWidgetController)? onControllerCreated;
   final VoidCallback? onReady;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onVideoCompleted;
@@ -18,9 +18,9 @@ class VideoPlayerWidget extends StatefulWidget {
   final int? totalEpisodes;
   final String? sourceName;
 
-  const VideoPlayerWidget({
+  const MobileVideoPlayerWidget({
     super.key,
-    this.dataSource,
+    this.url,
     this.onBackPressed,
     this.onControllerCreated,
     this.onReady,
@@ -36,18 +36,22 @@ class VideoPlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+  State<MobileVideoPlayerWidget> createState() => _MobileVideoPlayerWidgetState();
 }
 
-/// VideoPlayerWidget 的控制器，用于外部控制播放器
-class VideoPlayerWidgetController {
-  final _VideoPlayerWidgetState _state;
+/// MobileVideoPlayerWidget 的控制器，用于外部控制播放器
+class MobileVideoPlayerWidgetController {
+  final _MobileVideoPlayerWidgetState _state;
 
-  VideoPlayerWidgetController._(this._state);
+  MobileVideoPlayerWidgetController._(this._state);
 
   /// 动态更新视频数据源
-  Future<void> updateDataSource(BetterPlayerDataSource dataSource,
-      {Duration? startAt}) async {
+  Future<void> updateDataSource(String url, {Duration? startAt}) async {
+    final dataSource = BetterPlayerDataSource(
+      BetterPlayerDataSourceType.network,
+      url,
+      videoFormat: BetterPlayerVideoFormat.hls,
+    );
     await _state.updateDataSource(dataSource, startAt: startAt);
   }
 
@@ -95,7 +99,7 @@ class VideoPlayerWidgetController {
   }
 }
 
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
+class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget>
     with WidgetsBindingObserver {
   bool _isInitialized = false;
   BetterPlayerController? _betterPlayerController;
@@ -111,9 +115,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _currentDataSource = widget.dataSource;
+    if (widget.url != null) {
+      _currentDataSource = BetterPlayerDataSource(
+        BetterPlayerDataSourceType.network,
+        widget.url!,
+        videoFormat: BetterPlayerVideoFormat.hls,
+      );
+    }
     _initializePlayer();
-    widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
+    widget.onControllerCreated?.call(MobileVideoPlayerWidgetController._(this));
   }
 
   Future<void> _initializePlayer({Duration? startAt}) async {
@@ -142,7 +152,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
             onFullscreenChange: _handleFullscreenChange,
             onNextEpisode: widget.onNextEpisode,
             onPause: widget.onPause,
-            playerController: VideoPlayerWidgetController._(this),
+            playerController: MobileVideoPlayerWidgetController._(this),
             videoUrl: _currentDataSource?.url ?? '',
             isLastEpisode: widget.isLastEpisode,
             betterPlayerKey: _betterPlayerKey,

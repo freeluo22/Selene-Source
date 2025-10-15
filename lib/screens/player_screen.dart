@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:awesome_video_player/awesome_video_player.dart';
-import '../widgets/video_player_widget.dart';
+import '../widgets/mobile_video_player_widget.dart';
 import '../widgets/video_card.dart';
 import '../services/api_service.dart';
 import '../services/m3u8_service.dart';
@@ -84,8 +84,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   // 所有源测速结果
   Map<String, SourceSpeed> allSourcesSpeed = {};
 
-  // VideoPlayerWidget 的控制器
-  VideoPlayerWidgetController? _videoPlayerController;
+  // MobileVideoPlayerWidget 的控制器
+  MobileVideoPlayerWidgetController? _mobileVideoPlayerController;
 
   // 收藏状态
   bool _isFavorite = false;
@@ -434,9 +434,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         duration = _dlnaCurrentDuration;
       } else {
         // 本地播放：从视频播放器获取
-        if (_videoPlayerController == null) return;
-        currentPosition = _videoPlayerController!.currentPosition;
-        duration = _videoPlayerController!.duration;
+        if (_mobileVideoPlayerController == null) return;
+        currentPosition = _mobileVideoPlayerController!.currentPosition;
+        duration = _mobileVideoPlayerController!.duration;
       }
 
       // 提前获取所有需要的参数，避免异步执行时参数被改变
@@ -581,12 +581,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             startAt: startAt);
       } else {
         // 本地播放：调用视频播放器的 updateDataSource
-        final dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.network,
-          newUrl,
-          videoFormat: BetterPlayerVideoFormat.hls,
-        );
-        await _videoPlayerController?.updateDataSource(dataSource,
+        await _mobileVideoPlayerController?.updateDataSource(newUrl,
             startAt: startAt);
       }
     } catch (e) {
@@ -597,7 +592,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 跳转到指定进度
   Future<void> seekToProgress(Duration position) async {
     try {
-      await _videoPlayerController?.seekTo(position);
+      await _mobileVideoPlayerController?.seekTo(position);
     } catch (e) {
       // 静默处理错误
     }
@@ -615,7 +610,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       return _dlnaCurrentPosition;
     } else {
       // 本地播放：从视频播放器获取
-      return _videoPlayerController?.currentPosition;
+      return _mobileVideoPlayerController?.currentPosition;
     }
   }
 
@@ -638,17 +633,18 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 添加视频播放进度监听器
   void _addVideoProgressListener() {
-    if (_videoPlayerController != null) {
+    if (_mobileVideoPlayerController != null) {
       // 添加进度监听器
-      _videoPlayerController!.addProgressListener(_onVideoProgressUpdate);
+      _mobileVideoPlayerController!.addProgressListener(_onVideoProgressUpdate);
     }
   }
 
   /// 移除视频播放进度监听器
   void _removeVideoProgressListener() {
-    if (_videoPlayerController != null) {
+    if (_mobileVideoPlayerController != null) {
       // 移除进度监听器
-      _videoPlayerController!.removeProgressListener(_onVideoProgressUpdate);
+      _mobileVideoPlayerController!
+          .removeProgressListener(_onVideoProgressUpdate);
     }
   }
 
@@ -938,11 +934,11 @@ class _PlayerScreenState extends State<PlayerScreen>
     return Stack(
       children: [
         if (!_isCasting)
-          VideoPlayerWidget(
-            dataSource: null,
+          MobileVideoPlayerWidget(
+            url: null,
             onBackPressed: _onBackPressed,
             onControllerCreated: (controller) {
-              _videoPlayerController = controller;
+              _mobileVideoPlayerController = controller;
             },
             onReady: _onVideoPlayerReady,
             onNextEpisode: _onNextEpisode,
@@ -994,15 +990,15 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 投屏开始回调
   void _onCastStarted(dynamic device) {
     // 保存当前播放位置
-    final currentPos = _videoPlayerController?.currentPosition;
+    final currentPos = _mobileVideoPlayerController?.currentPosition;
 
     setState(() {
       _isCasting = true;
       _dlnaDevice = device;
       _castStartPosition = currentPos;
       // 销毁视频播放器
-      _videoPlayerController?.dispose();
-      _videoPlayerController = null;
+      _mobileVideoPlayerController?.dispose();
+      _mobileVideoPlayerController = null;
     });
   }
 
@@ -1032,7 +1028,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _switchLoadingMessage = '视频加载中...';
     });
 
-    // 等待下一帧，确保 VideoPlayerWidget 已经重新创建
+    // 等待下一帧，确保 MobileVideoPlayerWidget 已经重新创建
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && currentDetail != null) {
         debugPrint('恢复播放: 第${resumeEpisodeIndex + 1}集, ${resumeSeconds}秒');
@@ -1340,8 +1336,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 处理推荐卡片点击
   void _onRecommendTap(DoubanRecommendItem recommend) {
     // 如果当前正在播放，则暂停播放
-    if (_videoPlayerController?.isPlaying == true) {
-      _videoPlayerController?.pause();
+    if (_mobileVideoPlayerController?.isPlaying == true) {
+      _mobileVideoPlayerController?.pause();
     }
 
     // 跳转到新的播放页，只传递title参数
@@ -2555,7 +2551,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 恢复原始的系统UI样式
     SystemChrome.setSystemUIOverlayStyle(_originalStyle);
     // 销毁播放器
-    _videoPlayerController?.dispose();
+    _mobileVideoPlayerController?.dispose();
     // 释放滚动控制器
     _episodesScrollController.dispose();
     _sourcesScrollController.dispose();
