@@ -592,11 +592,11 @@ class _SearchScreenState extends State<SearchScreen>
   Widget build(BuildContext context) {
     return Consumer<ThemeService>(
       builder: (context, themeService, child) {
-        return Scaffold(
-          backgroundColor: themeService.isDarkMode
+        return Container(
+          color: themeService.isDarkMode
               ? const Color(0xFF121212)
               : const Color(0xFFf5f5f5),
-          body: Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!_hasSearched) ...[
@@ -1482,9 +1482,7 @@ class _SearchScreenState extends State<SearchScreen>
     bool isHovered = _hoveredFilterPill == title;
 
     return MouseRegion(
-      cursor: DeviceUtils.isPC()
-          ? SystemMouseCursors.click
-          : MouseCursor.defer,
+      cursor: DeviceUtils.isPC() ? SystemMouseCursors.click : MouseCursor.defer,
       onEnter: DeviceUtils.isPC()
           ? (_) {
               setState(() {
@@ -1501,7 +1499,8 @@ class _SearchScreenState extends State<SearchScreen>
           : null,
       child: GestureDetector(
         onTap: () {
-          _showFilterOptions(context, title, options, selectedValue, onSelected);
+          _showFilterOptions(
+              context, title, options, selectedValue, onSelected);
         },
         child: Container(
           padding: EdgeInsets.fromLTRB(isFirst ? 0 : 8, 6, 8, 6),
@@ -1656,9 +1655,7 @@ class _SearchScreenState extends State<SearchScreen>
     bool isDefault = _yearSortOrder == SortOrder.none;
 
     return MouseRegion(
-      cursor: DeviceUtils.isPC()
-          ? SystemMouseCursors.click
-          : MouseCursor.defer,
+      cursor: DeviceUtils.isPC() ? SystemMouseCursors.click : MouseCursor.defer,
       onEnter: DeviceUtils.isPC()
           ? (_) {
               setState(() {
@@ -1697,12 +1694,14 @@ class _SearchScreenState extends State<SearchScreen>
                 text,
                 style: GoogleFonts.poppins(
                   fontSize: 13,
-                  color: (DeviceUtils.isPC() && _isYearSortHovered) || !isDefault
-                      ? const Color(0xFF27AE60)
-                      : Theme.of(context).textTheme.bodySmall?.color,
-                  fontWeight: (DeviceUtils.isPC() && _isYearSortHovered) || !isDefault
-                      ? FontWeight.w500
-                      : FontWeight.normal,
+                  color:
+                      (DeviceUtils.isPC() && _isYearSortHovered) || !isDefault
+                          ? const Color(0xFF27AE60)
+                          : Theme.of(context).textTheme.bodySmall?.color,
+                  fontWeight:
+                      (DeviceUtils.isPC() && _isYearSortHovered) || !isDefault
+                          ? FontWeight.w500
+                          : FontWeight.normal,
                 ),
               ),
               const SizedBox(width: 4),
