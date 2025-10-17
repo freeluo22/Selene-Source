@@ -846,42 +846,47 @@ class _CustomBetterPlayerControlsState
 
     final chosenSpeed = await showModalBottomSheet<double>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  children: speeds.map((speed) {
-                    return ListTile(
-                      title: Text(
-                        '${speed}x',
-                        style: TextStyle(
-                          color: speed == currentSpeed
-                              ? Theme.of(context).primaryColor
-                              : null,
-                          fontWeight: speed == currentSpeed
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    children: speeds.map((speed) {
+                      final isSelected = speed == currentSpeed;
+                      return ListTile(
+                        title: Text(
+                          '${speed}x',
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.red
+                                : (isDarkMode ? Colors.white : Colors.black),
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
                         ),
-                      ),
-                      onTap: () {
-                        Navigator.of(context).pop(speed);
-                      },
-                    );
-                  }).toList(),
+                        onTap: () {
+                          Navigator.of(context).pop(speed);
+                        },
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     if (chosenSpeed != null) {

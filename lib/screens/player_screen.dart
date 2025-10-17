@@ -1443,9 +1443,33 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 处理推荐卡片点击
   void _onRecommendTap(DoubanRecommendItem recommend) {
-    // 如果当前正在播放，则暂停播放
-    if (_mobileVideoPlayerController?.isPlaying == true) {
-      _mobileVideoPlayerController?.pause();
+    // 投屏状态下，弹窗提示用户先关闭投屏
+    if (_isCasting) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('提示'),
+          content: const Text('请先关闭投屏后再切换视频'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 本地播放：根据设备类型暂停对应播放器
+    if (DeviceUtils.isPC()) {
+      if (_pcVideoPlayerController?.isPlaying == true) {
+        _pcVideoPlayerController?.pause();
+      }
+    } else {
+      if (_mobileVideoPlayerController?.isPlaying == true) {
+        _mobileVideoPlayerController?.pause();
+      }
     }
 
     // 跳转到新的播放页，只传递title参数
