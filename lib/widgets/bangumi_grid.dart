@@ -4,7 +4,6 @@ import '../models/bangumi.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
 import 'video_card.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'video_menu_bottom_sheet.dart';
 import '../models/video_info.dart';
 import 'shimmer_effect.dart';

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/douban_movie.dart';
 import '../utils/device_utils.dart';
 import 'video_card.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'video_menu_bottom_sheet.dart';
 import '../models/video_info.dart';
 import '../utils/font_utils.dart';

@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:gal/gal.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:provider/provider.dart';

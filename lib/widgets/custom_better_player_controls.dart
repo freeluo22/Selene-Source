@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:awesome_video_player/awesome_video_player.dart';
+import 'package:volume_controller/volume_controller.dart';
 import 'mobile_video_player_widget.dart';
 import 'dlna_device_dialog.dart';
 
@@ -64,17 +65,37 @@ class _CustomBetterPlayerControlsState
   bool _isInPipMode = false;
   bool _isShowingDLNADialog = false;
   bool _isLocked = false;
+  double _currentVolume = 0.5;
+  bool _showVolumeIndicator = false;
+  Timer? _volumeHideTimer;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addEventsListener(_onVideoStateChanged);
     widget.controller.videoPlayerController?.addListener(_onVideoPlayerUpdate);
+    _initVolume();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _forceStartHideTimer();
       }
     });
+  }
+
+  Future<void> _initVolume() async {
+    try {
+      // 隐藏系统音量UI
+      VolumeController.instance.showSystemUI = false;
+      final volume = await VolumeController.instance.getVolume();
+      if (mounted) {
+        setState(() {
+          _currentVolume = volume;
+        });
+      }
+    } catch (e) {
+      // 如果获取音量失败，使用默认值
+      _currentVolume = 0.5;
+    }
   }
 
   void _onVideoPlayerUpdate() {
@@ -196,6 +217,9 @@ class _CustomBetterPlayerControlsState
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _volumeHideTimer?.cancel();
+    // 恢复系统音量UI显示
+    VolumeController.instance.showSystemUI = true;
     widget.controller.videoPlayerController
         ?.removeListener(_onVideoPlayerUpdate);
     widget.controller.removeEventsListener(_onVideoStateChanged);
@@ -355,6 +379,48 @@ class _CustomBetterPlayerControlsState
     _startHideTimer();
   }
 
+  void _onVolumeSwipeStart(DragStartDetails details) {
+    if (!mounted || _isLocked) return;
+    _volumeHideTimer?.cancel();
+    _hideTimer?.cancel(); // 取消 controls 自动隐藏
+    setState(() {
+      _controlsVisible = true; // 确保 controls 显示
+    });
+  }
+
+  void _onVolumeSwipeUpdate(DragUpdateDetails details) {
+    if (!mounted || _isLocked) return;
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final deltaY = details.delta.dy;
+    final volumeChange = -(deltaY / screenHeight) * 2; // 负号因为向上滑动是负值
+
+    setState(() {
+      _currentVolume = (_currentVolume + volumeChange).clamp(0.0, 1.0);
+      _showVolumeIndicator = true;
+    });
+
+    VolumeController.instance.setVolume(_currentVolume);
+    _startVolumeHideTimer();
+  }
+
+  void _onVolumeSwipeEnd(DragEndDetails details) {
+    if (!mounted || _isLocked) return;
+    _startVolumeHideTimer();
+    _startHideTimer(); // 重新启动 controls 自动隐藏计时器
+  }
+
+  void _startVolumeHideTimer() {
+    _volumeHideTimer?.cancel();
+    _volumeHideTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showVolumeIndicator = false;
+        });
+      }
+    });
+  }
+
   void _exitFullscreen() {
     if (!mounted) return;
     widget.onFullscreenChange(false);
@@ -454,29 +520,52 @@ class _CustomBetterPlayerControlsState
         children: [
           // 背景层 - 处理长按和滑动手势
           Positioned.fill(
-            child: GestureDetector(
-              onLongPressStart:
-                  (_isInPipMode || _isLocked) ? null : _onLongPressStart,
-              onLongPressEnd:
-                  (_isInPipMode || _isLocked) ? null : _onLongPressEnd,
-              onLongPressCancel: (_isInPipMode || _isLocked)
-                  ? null
-                  : () {
-                      if (_isLongPressing) {
-                        _onLongPressEnd(const LongPressEndDetails());
-                      }
-                    },
-              onHorizontalDragStart:
-                  (_isInPipMode || _isLocked) ? null : _onSwipeStart,
-              onHorizontalDragUpdate:
-                  (_isInPipMode || _isLocked) ? null : _onSwipeUpdate,
-              onHorizontalDragEnd:
-                  (_isInPipMode || _isLocked) ? null : _onSwipeEnd,
-              onTap: _isInPipMode ? null : _onBlankAreaTap,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                color: Colors.transparent,
-              ),
+            child: Row(
+              children: [
+                // 左侧和中间区域 - 处理长按和水平滑动
+                Expanded(
+                  flex: isFullscreen ? 3 : 1,
+                  child: GestureDetector(
+                    onLongPressStart:
+                        (_isInPipMode || _isLocked) ? null : _onLongPressStart,
+                    onLongPressEnd:
+                        (_isInPipMode || _isLocked) ? null : _onLongPressEnd,
+                    onLongPressCancel: (_isInPipMode || _isLocked)
+                        ? null
+                        : () {
+                            if (_isLongPressing) {
+                              _onLongPressEnd(const LongPressEndDetails());
+                            }
+                          },
+                    onHorizontalDragStart:
+                        (_isInPipMode || _isLocked) ? null : _onSwipeStart,
+                    onHorizontalDragUpdate:
+                        (_isInPipMode || _isLocked) ? null : _onSwipeUpdate,
+                    onHorizontalDragEnd:
+                        (_isInPipMode || _isLocked) ? null : _onSwipeEnd,
+                    onTap: _isInPipMode ? null : _onBlankAreaTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      color: Colors.transparent,
+                    ),
+                  ),
+                ),
+                // 右侧区域 - 处理音量调节（仅在全屏时）
+                if (isFullscreen)
+                  Expanded(
+                    flex: 1,
+                    child: GestureDetector(
+                      onVerticalDragStart: _onVolumeSwipeStart,
+                      onVerticalDragUpdate: _onVolumeSwipeUpdate,
+                      onVerticalDragEnd: _onVolumeSwipeEnd,
+                      onTap: _isInPipMode ? null : _onBlankAreaTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           // 长按倍速提示
@@ -505,47 +594,112 @@ class _CustomBetterPlayerControlsState
                 ],
               ),
             ),
-          // 全屏锁定按钮 - 在全屏时显示
+          // 全屏锁定按钮和音量指示器 - 在全屏时显示（同一位置）
           if (isFullscreen)
             Positioned(
               right: 16.0,
               top: 0,
               bottom: 0,
               child: Center(
-                child: AnimatedOpacity(
-                  opacity: _controlsVisible ? 1.0 : 0.0,
+                child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
-                  child: IgnorePointer(
-                    ignoring: !_controlsVisible,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isLocked = !_isLocked;
-                          if (_isLocked) {
-                            // 锁定时启动自动隐藏计时器
-                            _startHideTimer();
-                          } else {
-                            // 解锁时显示控件并启动计时器
-                            _controlsVisible = true;
-                            _startHideTimer();
-                          }
-                        });
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(24),
+                  child: _showVolumeIndicator && !_isLocked
+                      ? Container(
+                          key: const ValueKey('volume'),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _currentVolume == 0
+                                    ? Icons.volume_off
+                                    : _currentVolume < 0.5
+                                        ? Icons.volume_down
+                                        : Icons.volume_up,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 100,
+                                width: 4,
+                                child: Stack(
+                                  children: [
+                                    // 背景
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    // 当前音量
+                                    Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: FractionallySizedBox(
+                                        heightFactor: _currentVolume,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${(_currentVolume * 100).round()}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : AnimatedOpacity(
+                          key: const ValueKey('lock'),
+                          opacity: _controlsVisible ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: IgnorePointer(
+                            ignoring: !_controlsVisible,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isLocked = !_isLocked;
+                                  if (_isLocked) {
+                                    // 锁定时启动自动隐藏计时器
+                                    _startHideTimer();
+                                  } else {
+                                    // 解锁时显示控件并启动计时器
+                                    _controlsVisible = true;
+                                    _startHideTimer();
+                                  }
+                                });
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Icon(
+                                  _isLocked ? Icons.lock : Icons.lock_open,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: Icon(
-                          _isLocked ? Icons.lock : Icons.lock_open,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),

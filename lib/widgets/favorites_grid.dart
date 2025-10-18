@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/favorite_item.dart';
 import '../widgets/video_card.dart';
 import '../models/play_record.dart';
