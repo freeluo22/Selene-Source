@@ -1054,7 +1054,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Text(
-                      '${currentVolume.round()}%',
+                      '${currentVolume.round()}',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: effectiveFullscreen ? 14 : 12,
