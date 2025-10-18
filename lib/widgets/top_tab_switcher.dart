@@ -22,9 +22,10 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  
+
   // 用于跟踪鼠标悬停状态
   bool _isHoveringHome = false;
+  bool _isHoveringHistory = false;
   bool _isHoveringFavorites = false;
 
   @override
@@ -34,7 +35,7 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _animation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -46,6 +47,8 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
     // 根据初始选中状态设置动画
     if (widget.selectedTab == '首页') {
       _animationController.value = 0.0;
+    } else if (widget.selectedTab == '播放历史') {
+      _animationController.value = 0.5;
     } else {
       _animationController.value = 1.0;
     }
@@ -64,11 +67,13 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
     if (_animationController.isAnimating) {
       return;
     }
-    
+
     if (tab == '首页') {
-      _animationController.reverse();
+      _animationController.animateTo(0.0);
+    } else if (tab == '播放历史') {
+      _animationController.animateTo(0.5);
     } else {
-      _animationController.forward();
+      _animationController.animateTo(1.0);
     }
   }
 
@@ -85,93 +90,115 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
         return Center(
           child: Container(
             margin: const EdgeInsets.only(top: 20, bottom: 8),
-            width: 160, // 缩小宽度
-            height: 32, // 缩小高度
+            width: 240, // 增加宽度以容纳三个选项
+            height: 32,
             decoration: BoxDecoration(
-              color: themeService.isDarkMode 
-                  ? const Color(0xFF333333) 
-                  : const Color(0xFFe0e0e0), // 根据主题调整背景色
-              borderRadius: BorderRadius.circular(16), // 相应调整圆角
+              color: themeService.isDarkMode
+                  ? const Color(0xFF333333)
+                  : const Color(0xFFe0e0e0),
+              borderRadius: BorderRadius.circular(16),
             ),
-        child: Stack(
-          children: [
-            // 动画背景胶囊
-            AnimatedBuilder(
-              animation: _animation,
-              builder: (context, child) {
-                return Positioned(
-                  left: _animation.value * 80, // 80是每个胶囊的宽度
-                  top: 0,
-                  child: Container(
-                    width: 80,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: themeService.isDarkMode 
-                          ? const Color(0xFF1e1e1e)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeService.isDarkMode 
-                              ? Colors.black.withOpacity(0.3)
-                              : Colors.black.withOpacity(0.1),
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            // 标签按钮
-            Row(
+            child: Stack(
               children: [
-                // 首页按钮
-                Expanded(
-                  child: _buildTabButton('首页', widget.selectedTab == '首页', 0, themeService),
+                // 动画背景胶囊
+                AnimatedBuilder(
+                  animation: _animation,
+                  builder: (context, child) {
+                    // 计算背景位置：0 = 首页(0), 0.5 = 播放历史(80), 1.0 = 收藏夹(160)
+                    final double leftPosition = _animation.value * 160;
+                    return Positioned(
+                      left: leftPosition,
+                      top: 0,
+                      child: Container(
+                        width: 80,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: themeService.isDarkMode
+                              ? const Color(0xFF1e1e1e)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: themeService.isDarkMode
+                                  ? Colors.black.withValues(alpha: 0.3)
+                                  : Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                // 收藏夹按钮
-                Expanded(
-                  child: _buildTabButton('收藏夹', widget.selectedTab == '收藏夹', 1, themeService),
+                // 标签按钮
+                Row(
+                  children: [
+                    // 首页按钮
+                    Expanded(
+                      child: _buildTabButton(
+                          '首页', widget.selectedTab == '首页', 0, themeService),
+                    ),
+                    // 播放历史按钮
+                    Expanded(
+                      child: _buildTabButton('播放历史',
+                          widget.selectedTab == '播放历史', 1, themeService),
+                    ),
+                    // 收藏夹按钮
+                    Expanded(
+                      child: _buildTabButton(
+                          '收藏夹', widget.selectedTab == '收藏夹', 2, themeService),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
       },
     );
   }
 
   /// 构建标签按钮
-  Widget _buildTabButton(String label, bool isSelected, int index, ThemeService themeService) {
+  Widget _buildTabButton(
+      String label, bool isSelected, int index, ThemeService themeService) {
     final bool isPC = DeviceUtils.isPC();
-    final bool isHovering = label == '首页' ? _isHoveringHome : _isHoveringFavorites;
-    
+    final bool isHovering = label == '首页'
+        ? _isHoveringHome
+        : label == '播放历史'
+            ? _isHoveringHistory
+            : _isHoveringFavorites;
+
     return SizedBox(
       height: 32,
       child: MouseRegion(
         cursor: isPC ? SystemMouseCursors.click : MouseCursor.defer,
-        onEnter: isPC ? (_) {
-          setState(() {
-            if (label == '首页') {
-              _isHoveringHome = true;
-            } else {
-              _isHoveringFavorites = true;
-            }
-          });
-        } : null,
-        onExit: isPC ? (_) {
-          setState(() {
-            if (label == '首页') {
-              _isHoveringHome = false;
-            } else {
-              _isHoveringFavorites = false;
-            }
-          });
-        } : null,
+        onEnter: isPC
+            ? (_) {
+                setState(() {
+                  if (label == '首页') {
+                    _isHoveringHome = true;
+                  } else if (label == '播放历史') {
+                    _isHoveringHistory = true;
+                  } else {
+                    _isHoveringFavorites = true;
+                  }
+                });
+              }
+            : null,
+        onExit: isPC
+            ? (_) {
+                setState(() {
+                  if (label == '首页') {
+                    _isHoveringHome = false;
+                  } else if (label == '播放历史') {
+                    _isHoveringHistory = false;
+                  } else {
+                    _isHoveringFavorites = false;
+                  }
+                });
+              }
+            : null,
         child: GestureDetector(
           onTap: () {
             // 防止动画进行中的重复点击
@@ -179,51 +206,67 @@ class _TopTabSwitcherState extends State<TopTabSwitcher>
               widget.onTabChanged(label);
             }
           },
-          behavior: HitTestBehavior.opaque, // 确保整个区域都可以点击
+          behavior: HitTestBehavior.opaque,
           child: AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
               // 计算当前按钮的文字颜色
               Color textColor;
               FontWeight fontWeight;
-              
+
               if (label == '首页') {
-                // 首页按钮：动画值越小（接近0）越选中
-                double progress = 1.0 - _animation.value;
+                // 首页按钮：动画值为0时选中
+                double progress = 1.0 - (_animation.value * 2).clamp(0.0, 1.0);
                 textColor = Color.lerp(
-                  themeService.isDarkMode 
-                      ? const Color(0xFFb0b0b0) 
-                      : const Color(0xFF7f8c8d), // 未选中颜色
-                  themeService.isDarkMode 
-                      ? const Color(0xFFffffff) 
-                      : const Color(0xFF2c3e50), // 选中颜色
+                  themeService.isDarkMode
+                      ? const Color(0xFFb0b0b0)
+                      : const Color(0xFF7f8c8d),
+                  themeService.isDarkMode
+                      ? const Color(0xFFffffff)
+                      : const Color(0xFF2c3e50),
+                  progress,
+                )!;
+                fontWeight = progress > 0.5 ? FontWeight.w600 : FontWeight.w400;
+              } else if (label == '播放历史') {
+                // 播放历史按钮：动画值为0.5时选中
+                double progress = 1.0 - ((_animation.value - 0.5).abs() * 2);
+                progress = progress.clamp(0.0, 1.0);
+                textColor = Color.lerp(
+                  themeService.isDarkMode
+                      ? const Color(0xFFb0b0b0)
+                      : const Color(0xFF7f8c8d),
+                  themeService.isDarkMode
+                      ? const Color(0xFFffffff)
+                      : const Color(0xFF2c3e50),
                   progress,
                 )!;
                 fontWeight = progress > 0.5 ? FontWeight.w600 : FontWeight.w400;
               } else {
-                // 收藏夹按钮：动画值越大（接近1）越选中
+                // 收藏夹按钮：动画值为1时选中
+                double progress =
+                    ((_animation.value - 0.5) * 2).clamp(0.0, 1.0);
                 textColor = Color.lerp(
-                  themeService.isDarkMode 
-                      ? const Color(0xFFb0b0b0) 
-                      : const Color(0xFF7f8c8d), // 未选中颜色
-                  themeService.isDarkMode 
-                      ? const Color(0xFFffffff) 
-                      : const Color(0xFF2c3e50), // 选中颜色
-                  _animation.value,
+                  themeService.isDarkMode
+                      ? const Color(0xFFb0b0b0)
+                      : const Color(0xFF7f8c8d),
+                  themeService.isDarkMode
+                      ? const Color(0xFFffffff)
+                      : const Color(0xFF2c3e50),
+                  progress,
                 )!;
-                fontWeight = _animation.value > 0.5 ? FontWeight.w600 : FontWeight.w400;
+                fontWeight = progress > 0.5 ? FontWeight.w600 : FontWeight.w400;
               }
-              
+
               // PC端悬停时文字变绿色
               if (isPC && isHovering) {
-                textColor = const Color(0xFF27AE60); // 绿色
+                textColor = const Color(0xFF27AE60);
               }
 
               return Center(
                 child: Text(
                   label,
                   style: FontUtils.poppins(
-                    fontSize: 12, // 缩小字体
+                    fontSize: 11,
                     fontWeight: fontWeight,
                     color: textColor,
                   ),

@@ -7,6 +7,7 @@ import '../widgets/bangumi_section.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/top_tab_switcher.dart';
 import '../widgets/favorites_grid.dart';
+import '../widgets/history_grid.dart';
 import 'search_screen.dart';
 import '../widgets/video_menu_bottom_sheet.dart';
 import '../widgets/custom_refresh_indicator.dart';
@@ -59,9 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
       
       // 异步刷新播放记录缓存
       cacheService.refreshPlayRecords(context).then((_) {
-        // 刷新成功后通知继续观看组件更新UI
+        // 刷新成功后通知继续观看组件和播放历史组件更新UI
         if (mounted) {
           ContinueWatchingSection.refreshPlayRecords();
+          HistoryGrid.refreshHistory();
         }
       }).catchError((e) {
         // 静默处理错误
@@ -93,6 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         // 刷新继续观看组件
         await ContinueWatchingSection.refreshPlayRecords();
+        
+        // 刷新播放历史组件
+        await HistoryGrid.refreshHistory();
         
         // 刷新收藏夹组件
         await FavoritesGrid.refreshFavorites();
@@ -140,6 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ContinueWatchingSection(
                         onVideoTap: _onVideoTap,
                         onGlobalMenuAction: _onGlobalMenuAction,
+                        onViewAll: () {
+                          // 切换到播放历史标签
+                          _onTopTabChanged('播放历史');
+                        },
                       ),
                       // 热门电影组件
                       HotMoviesSection(
@@ -241,32 +250,42 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   )
-                : Column(
-                    children: [
-                      const SizedBox(height: 4), // 收藏夹内容更靠近切换按钮
-                      FavoritesGrid(
-                        onVideoTap: _onVideoTap,
-                        onGlobalMenuAction: (VideoInfo videoInfo, VideoMenuAction action) {
-                          // 将VideoInfo转换为PlayRecord用于统一处理
-                          final playRecord = PlayRecord(
-                            id: videoInfo.id,
-                            source: videoInfo.source,
-                            title: videoInfo.title,
-                            sourceName: videoInfo.sourceName,
-                            year: videoInfo.year,
-                            cover: videoInfo.cover,
-                            index: videoInfo.index,
-                            totalEpisodes: videoInfo.totalEpisodes,
-                            playTime: videoInfo.playTime,
-                            totalTime: videoInfo.totalTime,
-                            saveTime: videoInfo.saveTime,
-                            searchTitle: videoInfo.searchTitle,
-                          );
-                          _onGlobalMenuAction(playRecord, action);
-                        },
+                : tab == '播放历史'
+                    ? Column(
+                        children: [
+                          const SizedBox(height: 4),
+                          HistoryGrid(
+                            onVideoTap: _onVideoTap,
+                            onGlobalMenuAction: _onGlobalMenuAction,
+                          ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          const SizedBox(height: 4),
+                          FavoritesGrid(
+                            onVideoTap: _onVideoTap,
+                            onGlobalMenuAction: (VideoInfo videoInfo, VideoMenuAction action) {
+                              // 将VideoInfo转换为PlayRecord用于统一处理
+                              final playRecord = PlayRecord(
+                                id: videoInfo.id,
+                                source: videoInfo.source,
+                                title: videoInfo.title,
+                                sourceName: videoInfo.sourceName,
+                                year: videoInfo.year,
+                                cover: videoInfo.cover,
+                                index: videoInfo.index,
+                                totalEpisodes: videoInfo.totalEpisodes,
+                                playTime: videoInfo.playTime,
+                                totalTime: videoInfo.totalTime,
+                                saveTime: videoInfo.saveTime,
+                                searchTitle: videoInfo.searchTitle,
+                              );
+                              _onGlobalMenuAction(playRecord, action);
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
           ],
         ),
       ),
@@ -521,8 +540,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 从继续观看UI中移除播放记录
   void _removePlayRecordFromUI(PlayRecord playRecord) {
-    // 调用继续观看组件的静态移除方法
+    // 调用继续观看组件和播放历史组件的静态移除方法
     ContinueWatchingSection.removePlayRecordFromUI(
+      playRecord.source, 
+      playRecord.id
+    );
+    HistoryGrid.removeHistoryFromUI(
       playRecord.source, 
       playRecord.id
     );
@@ -594,9 +617,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 从播放页返回时刷新播放记录
   Future<void> _refreshOnResume() async {
     try {
-      // 通知继续观看组件更新UI
+      // 通知继续观看组件和播放历史组件更新UI
       if (mounted) {
         ContinueWatchingSection.refreshPlayRecords();
+        HistoryGrid.refreshHistory();
         FavoritesGrid.refreshFavorites();
       }
     } catch (e) {

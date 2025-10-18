@@ -18,12 +18,14 @@ class ContinueWatchingSection extends StatefulWidget {
   final Function(PlayRecord)? onVideoTap;
   final VoidCallback? onClear;
   final Function(PlayRecord, VideoMenuAction)? onGlobalMenuAction;
+  final VoidCallback? onViewAll;
 
   const ContinueWatchingSection({
     super.key,
     this.onVideoTap,
     this.onClear,
     this.onGlobalMenuAction,
+    this.onViewAll,
   });
 
   @override
@@ -60,6 +62,7 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
   
   // hover 状态
   bool _isClearButtonHovered = false;
+  bool _isMoreButtonHovered = false;
 
   @override
   void initState() {
@@ -486,26 +489,75 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题和清空按钮
+          // 标题、清空按钮和查看更多按钮
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Consumer<ThemeService>(
-                  builder: (context, themeService, child) {
-                    return Text(
-                      '继续观看',
-                      style: FontUtils.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: themeService.isDarkMode
-                            ? const Color(0xFFffffff)
-                            : const Color(0xFF2c3e50),
+                // 左侧：标题和清空按钮
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Consumer<ThemeService>(
+                      builder: (context, themeService, child) {
+                        return Text(
+                          '继续观看',
+                          style: FontUtils.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: themeService.isDarkMode
+                                ? const Color(0xFFffffff)
+                                : const Color(0xFF2c3e50),
+                          ),
+                        );
+                      },
+                    ),
+                    if (_playRecords.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      MouseRegion(
+                        cursor: DeviceUtils.isPC()
+                            ? SystemMouseCursors.click
+                            : MouseCursor.defer,
+                        onEnter: DeviceUtils.isPC()
+                            ? (_) {
+                                setState(() {
+                                  _isClearButtonHovered = true;
+                                });
+                              }
+                            : null,
+                        onExit: DeviceUtils.isPC()
+                            ? (_) {
+                                setState(() {
+                                  _isClearButtonHovered = false;
+                                });
+                              }
+                            : null,
+                        child: TextButton(
+                          onPressed: _showClearConfirmation,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 0),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            overlayColor: Colors.transparent,
+                          ),
+                          child: Text(
+                            '清空',
+                            style: FontUtils.poppins(
+                              fontSize: 14,
+                              color: DeviceUtils.isPC() && _isClearButtonHovered
+                                  ? const Color(0xFFe74c3c) // hover 时红色
+                                  : const Color(0xFF7f8c8d),
+                            ),
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                    ],
+                  ],
                 ),
+                // 右侧：查看更多按钮
                 if (_playRecords.isNotEmpty)
                   MouseRegion(
                     cursor: DeviceUtils.isPC()
@@ -514,19 +566,19 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                     onEnter: DeviceUtils.isPC()
                         ? (_) {
                             setState(() {
-                              _isClearButtonHovered = true;
+                              _isMoreButtonHovered = true;
                             });
                           }
                         : null,
                     onExit: DeviceUtils.isPC()
                         ? (_) {
                             setState(() {
-                              _isClearButtonHovered = false;
+                              _isMoreButtonHovered = false;
                             });
                           }
                         : null,
                     child: TextButton(
-                      onPressed: _showClearConfirmation,
+                      onPressed: widget.onViewAll,
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -535,11 +587,11 @@ class _ContinueWatchingSectionState extends State<ContinueWatchingSection>
                         overlayColor: Colors.transparent,
                       ),
                       child: Text(
-                        '清空',
+                        '查看全部 >',
                         style: FontUtils.poppins(
                           fontSize: 14,
-                          color: DeviceUtils.isPC() && _isClearButtonHovered
-                              ? const Color(0xFFe74c3c) // hover 时红色
+                          color: DeviceUtils.isPC() && _isMoreButtonHovered
+                              ? const Color(0xFF27ae60) // hover 时绿色
                               : const Color(0xFF7f8c8d),
                         ),
                       ),
