@@ -43,8 +43,8 @@ void main() async {
   if (Platform.isWindows) {
     doWhenWindowReady(() {
       final win = appWindow;
-      const initialSize = Size(1280, 720);
-      const minSize = Size(1024, 768);
+      const initialSize = Size(1024, 600);
+      const minSize = Size(1024, 600);
       win.minSize = minSize;
       win.size = initialSize;
       win.alignment = Alignment.center;
