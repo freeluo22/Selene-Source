@@ -9,7 +9,7 @@
 ; 版本号将在构建时通过命令行参数传入
 ; 例如: iscc /DMyAppVersion=1.4.3 installer.iss
 #ifndef MyAppVersion
-  #define MyAppVersion "1.4.3"
+  #define MyAppVersion "1.4.4"
 #endif
 
 [Setup]

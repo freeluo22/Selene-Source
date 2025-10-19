@@ -367,7 +367,7 @@ copy_artifacts() {
     if [ -d "build/windows/x64/runner/Release" ]; then
         # 创建 zip 文件（便携版）
         cd build/windows/x64/runner/Release
-        zip -r "../../../../../dist/selene-${APP_VERSION}-windows-x64-portable.zip" .
+        zip a "../../../../../dist/selene-${APP_VERSION}-windows-x64-portable.zip" .
         cd ../../../../../
         log_success "Windows x64 便携版已复制到 dist/selene-${APP_VERSION}-windows-x64-portable.zip"
     else
