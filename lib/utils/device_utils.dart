@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 /// 设备类型工具类
@@ -10,43 +8,37 @@ class DeviceUtils {
   /// 判断当前设备是否是平板
   ///
   /// 通过屏幕宽度判断，宽度 >= 600dp 视为平板
+  /// TV 版：永远返回 true
   static bool isTablet(BuildContext context) {
-    if (isPC()) {
-      return true;
-    }
-    final double width = MediaQuery.of(context).size.width;
-    return width >= tabletMinWidth;
+    // TV 版强制返回 true
+    return true;
   }
 
   /// 判断当前设备是否是平板竖屏
   ///
   /// 逻辑：isTablet 且宽高比小于等于 1.2
+  /// TV 版：永远返回 false
   static bool isPortraitTablet(BuildContext context) {
-    if (!isTablet(context)) {
-      return false;
-    }
-    if (isPC()) {
-      return false;
-    }
-
-    final Size size = MediaQuery.of(context).size;
-    final double aspectRatio = size.width / size.height;
-    return aspectRatio <= 1.2;
+    // TV 版强制返回 false
+    return false;
   }
 
   /// 判断当前平台是否是 Windows
+  /// TV 版：永远返回 false
   static bool isWindows() {
-    return Platform.isWindows;
+    return false;
   }
 
   /// 判断当前平台是否是 macOS
+  /// TV 版：永远返回 false
   static bool isMacOS() {
-    return Platform.isMacOS;
+    return false;
   }
 
   /// 判断当前平台是否是 PC（Windows 或 macOS）
+  /// TV 版：永远返回 false
   static bool isPC() {
-    return isWindows() || isMacOS();
+    return false;
   }
 
   /// 根据屏幕宽度动态计算平板模式下的列数（6～8列）
@@ -55,20 +47,10 @@ class DeviceUtils {
   /// - < 1000: 6列
   /// - 1000-1200: 7列
   /// - >= 1200: 8列
+  /// TV 版：永远返回 8
   static int getTabletColumnCount(BuildContext context) {
-    if (!isTablet(context)) {
-      return 3; // 手机模式固定3列
-    }
-
-    final double width = MediaQuery.of(context).size.width;
-
-    if (width < 1000) {
-      return 6;
-    } else if (width < 1200) {
-      return 7;
-    } else {
-      return 8;
-    }
+    // TV 版强制返回 8
+    return 8;
   }
 
   /// 根据屏幕宽度动态计算横向滚动列表的可见卡片数（5.75、6.75、7.75）
@@ -78,19 +60,10 @@ class DeviceUtils {
   /// - < 1000: 5.75列
   /// - 1000-1200: 6.75列
   /// - >= 1200: 7.75列
-  static double getHorizontalVisibleCards(BuildContext context, double mobileCardCount) {
-    if (!isTablet(context)) {
-      return mobileCardCount; // 手机模式使用传入的卡片数
-    }
-
-    final double width = MediaQuery.of(context).size.width;
-
-    if (width < 1000) {
-      return 5.75;
-    } else if (width < 1200) {
-      return 6.75;
-    } else {
-      return 7.75;
-    }
+  /// TV 版：永远返回 7.75
+  static double getHorizontalVisibleCards(
+      BuildContext context, double mobileCardCount) {
+    // TV 版强制返回 7.75
+    return 7.75;
   }
 }
