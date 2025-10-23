@@ -370,11 +370,13 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
   /// 构建播放器组件
   Widget _buildPlayerWidget() {
     final videoUrl = _currentChannel.uris[_currentSourceIndex];
+    final headers = _currentChannel.headers;
     
     if (DeviceUtils.isPC()) {
       return PcVideoPlayerWidget(
         key: ValueKey('${_currentChannel.id}_$_currentSourceIndex'),
         url: videoUrl,
+        headers: headers,
         videoTitle: _currentChannel.title,
         onBackPressed: () => Navigator.pop(context),
         onControllerCreated: (controller) {
@@ -386,6 +388,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
       return MobileVideoPlayerWidget(
         key: ValueKey('${_currentChannel.id}_$_currentSourceIndex'),
         url: videoUrl,
+        headers: headers,
         videoTitle: _currentChannel.title,
         onBackPressed: () => Navigator.pop(context),
         onControllerCreated: (controller) {

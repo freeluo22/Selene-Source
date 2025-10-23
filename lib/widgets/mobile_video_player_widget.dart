@@ -5,6 +5,7 @@ import 'custom_better_player_controls.dart';
 
 class MobileVideoPlayerWidget extends StatefulWidget {
   final String? url;
+  final Map<String, String>? headers;
   final VoidCallback? onBackPressed;
   final Function(MobileVideoPlayerWidgetController)? onControllerCreated;
   final VoidCallback? onReady;
@@ -22,6 +23,7 @@ class MobileVideoPlayerWidget extends StatefulWidget {
   const MobileVideoPlayerWidget({
     super.key,
     this.url,
+    this.headers,
     this.onBackPressed,
     this.onControllerCreated,
     this.onReady,
@@ -122,6 +124,7 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget>
       _currentDataSource = BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
         widget.url!,
+        headers: widget.headers,
         videoFormat: BetterPlayerVideoFormat.hls,
       );
     }

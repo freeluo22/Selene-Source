@@ -117,7 +117,7 @@ class LiveChannelService {
           final m3uContent = utf8.decode(m3uResponse.bodyBytes);
           
           // 解析 M3U 内容
-          final channels = _parseM3uContent(m3uContent, channelId);
+          final channels = _parseM3uContent(m3uContent, channelId, ua);
           allChannels.addAll(channels);
           channelId += channels.length;
         } catch (e) {
@@ -140,7 +140,7 @@ class LiveChannelService {
   }
 
   // 解析 M3U 内容
-  static List<LiveChannel> _parseM3uContent(String content, int startId) {
+  static List<LiveChannel> _parseM3uContent(String content, int startId, String? ua) {
     final channels = <LiveChannel>[];
     final lines = content.split('\n');
     final channelMap = <String, List<LiveChannel>>{};
@@ -170,6 +170,9 @@ class LiveChannelService {
           uris: [],
           group: groupMatch?.group(1)?.trim() ?? '未分组',
           number: int.tryParse(numMatch?.group(1)?.trim() ?? '') ?? -1,
+          headers: <String, String>{
+            'User-Agent': ua ?? 'AptvPlayer/1.4.10',
+          }
         );
       } else if (!trimmed.startsWith('#') && currentChannel != null) {
         final key = '${currentChannel.group}_${currentChannel.name}';

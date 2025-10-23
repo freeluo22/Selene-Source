@@ -7,6 +7,7 @@ import 'dlna_device_dialog.dart';
 
 class PcVideoPlayerWidget extends StatefulWidget {
   final String? url;
+  final Map<String, String>? headers;
   final VoidCallback? onBackPressed;
   final Function(PcVideoPlayerWidgetController)? onControllerCreated;
   final VoidCallback? onReady;
@@ -25,6 +26,7 @@ class PcVideoPlayerWidget extends StatefulWidget {
   const PcVideoPlayerWidget({
     super.key,
     this.url,
+    this.headers,
     this.onBackPressed,
     this.onControllerCreated,
     this.onReady,
@@ -113,6 +115,7 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
   final List<VoidCallback> _progressListeners = [];
   double _cachedPlaybackSpeed = 1.0;
   String? _currentUrl;
+  Map<String, String>? headers;
   bool _isLoadingVideo = false; // 视频加载状态
   StreamSubscription? _positionSubscription;
   StreamSubscription? _playingSubscription;
@@ -127,6 +130,9 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
     WidgetsBinding.instance.addObserver(this);
     if (widget.url != null) {
       _currentUrl = widget.url;
+    }
+    if (widget.headers != null) {
+      headers = widget.headers;
     }
     _initializePlayer();
     widget.onControllerCreated?.call(PcVideoPlayerWidgetController._(this));
@@ -146,7 +152,7 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
     _setupPlayerListeners();
 
     // 打开媒体
-    await _player!.open(Media(_currentUrl!, start: startAt), play: true);
+    await _player!.open(Media(_currentUrl!, start: startAt, httpHeaders: headers), play: true);
 
     setState(() {
       _isInitialized = true;
