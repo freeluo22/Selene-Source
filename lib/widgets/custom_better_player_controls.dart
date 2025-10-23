@@ -26,6 +26,7 @@ class CustomBetterPlayerControls extends StatefulWidget {
   final int? currentEpisodeIndex;
   final int? totalEpisodes;
   final String? sourceName;
+  final bool live;
 
   const CustomBetterPlayerControls({
     super.key,
@@ -45,6 +46,7 @@ class CustomBetterPlayerControls extends StatefulWidget {
     this.currentEpisodeIndex,
     this.totalEpisodes,
     this.sourceName,
+    this.live = false,
   });
 
   @override
@@ -210,7 +212,7 @@ class _CustomBetterPlayerControlsState
   }
 
   void _onLongPressStart(LongPressStartDetails details) {
-    if (!(widget.controller.isPlaying() ?? false)) {
+    if (widget.live || !(widget.controller.isPlaying() ?? false)) {
       return;
     }
 
@@ -223,7 +225,7 @@ class _CustomBetterPlayerControlsState
   }
 
   void _onLongPressEnd(LongPressEndDetails details) {
-    if (!_isLongPressing) {
+    if (widget.live || !_isLongPressing) {
       return;
     }
 
@@ -336,7 +338,7 @@ class _CustomBetterPlayerControlsState
   }
 
   void _onSwipeStart(DragStartDetails details) {
-    if (!mounted) return;
+    if (!mounted || widget.live) return;
 
     if (widget.controller.videoPlayerController?.value.hasError == true) {
       return;
@@ -354,7 +356,7 @@ class _CustomBetterPlayerControlsState
   }
 
   void _onSwipeUpdate(DragUpdateDetails details) {
-    if (!mounted || !_isSeekingViaSwipe) return;
+    if (!mounted || !_isSeekingViaSwipe || widget.live) return;
 
     if (widget.controller.videoPlayerController?.value.hasError == true) {
       return;
@@ -378,7 +380,7 @@ class _CustomBetterPlayerControlsState
   }
 
   void _onSwipeEnd(DragEndDetails details) {
-    if (!mounted || !_isSeekingViaSwipe) return;
+    if (!mounted || !_isSeekingViaSwipe || widget.live) return;
 
     if (widget.controller.videoPlayerController?.value.hasError == true) {
       setState(() {
@@ -1056,6 +1058,7 @@ class _CustomBetterPlayerControlsState
                     },
                     dragPosition: _dragPosition,
                     isSeekingViaSwipe: _isSeekingViaSwipe,
+                    live: widget.live,
                   ),
                 ),
               ),
@@ -1104,7 +1107,7 @@ class _CustomBetterPlayerControlsState
                             ),
                           ),
                         ),
-                        if (!widget.isLastEpisode)
+                        if (!widget.isLastEpisode && !widget.live)
                           Transform.translate(
                             offset: const Offset(-8, 0),
                             child: GestureDetector(
@@ -1123,20 +1126,23 @@ class _CustomBetterPlayerControlsState
                               ),
                             ),
                           ),
-                        Expanded(
-                          child: _buildPositionIndicator(),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.speed,
-                            color: Colors.white,
-                            size: isFullscreen ? 22 : 20,
+                        if (!widget.live)
+                          Expanded(
+                            child: _buildPositionIndicator(),
                           ),
-                          onPressed: () async {
-                            _onUserInteraction();
-                            await _showSpeedDialog();
-                          },
-                        ),
+                        if (widget.live) const Spacer(),
+                        if (!widget.live)
+                          IconButton(
+                            icon: Icon(
+                              Icons.speed,
+                              color: Colors.white,
+                              size: isFullscreen ? 22 : 20,
+                            ),
+                            onPressed: () async {
+                              _onUserInteraction();
+                              await _showSpeedDialog();
+                            },
+                          ),
                         if (!isFullscreen)
                           GestureDetector(
                             onTap: () {
@@ -1284,6 +1290,7 @@ class CustomVideoProgressBar extends StatefulWidget {
   final Function(Duration)? onPositionUpdate;
   final Duration? dragPosition;
   final bool isSeekingViaSwipe;
+  final bool live;
 
   const CustomVideoProgressBar({
     super.key,
@@ -1294,6 +1301,7 @@ class CustomVideoProgressBar extends StatefulWidget {
     this.onPositionUpdate,
     this.dragPosition,
     this.isSeekingViaSwipe = false,
+    this.live = false,
   });
 
   @override
@@ -1347,27 +1355,32 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
 
     double value = 0.0;
     if (duration.inMilliseconds > 0) {
-      value = position.inMilliseconds / duration.inMilliseconds;
+      // live 模式下进度固定在最后
+      if (widget.live) {
+        value = 1.0;
+      } else {
+        value = position.inMilliseconds / duration.inMilliseconds;
+      }
     }
 
-    if (_isDragging) {
+    if (_isDragging && !widget.live) {
       value = _dragValue;
     }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragStart: (details) {
+      onHorizontalDragStart: widget.live ? null : (details) {
         _isDragging = true;
         widget.onDragStart?.call();
         _updateDragPosition(details.localPosition.dx, context);
       },
-      onHorizontalDragUpdate: (details) {
+      onHorizontalDragUpdate: widget.live ? null : (details) {
         if (_isDragging) {
           widget.onDragUpdate?.call();
           _updateDragPosition(details.localPosition.dx, context);
         }
       },
-      onHorizontalDragEnd: (details) {
+      onHorizontalDragEnd: widget.live ? null : (details) {
         if (_isDragging) {
           final seekPosition = Duration(
               milliseconds: (_dragValue * duration.inMilliseconds).round());
@@ -1379,7 +1392,7 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
           widget.onDragEnd?.call();
         }
       },
-      onTapDown: (details) {
+      onTapDown: widget.live ? null : (details) {
         widget.onDragStart?.call();
         _updateDragPosition(details.localPosition.dx, context);
         final seekPosition = Duration(

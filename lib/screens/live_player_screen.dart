@@ -380,6 +380,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
         onControllerCreated: (controller) {
           _pcVideoPlayerController = controller;
         },
+        live: true,
       );
     } else {
       return MobileVideoPlayerWidget(
@@ -390,6 +391,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
         onControllerCreated: (controller) {
           _mobileVideoPlayerController = controller;
         },
+        live: true,
       );
     }
   }

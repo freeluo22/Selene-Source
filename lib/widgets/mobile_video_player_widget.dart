@@ -17,6 +17,7 @@ class MobileVideoPlayerWidget extends StatefulWidget {
   final int? currentEpisodeIndex;
   final int? totalEpisodes;
   final String? sourceName;
+  final bool live;
 
   const MobileVideoPlayerWidget({
     super.key,
@@ -33,6 +34,7 @@ class MobileVideoPlayerWidget extends StatefulWidget {
     this.currentEpisodeIndex,
     this.totalEpisodes,
     this.sourceName,
+    this.live = false,
   });
 
   @override
@@ -165,6 +167,7 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget>
             currentEpisodeIndex: widget.currentEpisodeIndex,
             totalEpisodes: widget.totalEpisodes,
             sourceName: widget.sourceName,
+            live: widget.live,
           );
         },
       ),
@@ -224,8 +227,8 @@ class _MobileVideoPlayerWidgetState extends State<MobileVideoPlayerWidget>
       widget.onReady?.call();
     }
 
-    // 检查视频是否播放完成
-    if (event.betterPlayerEventType == BetterPlayerEventType.finished) {
+    // 检查视频是否播放完成（live 模式下不监听）
+    if (!widget.live && event.betterPlayerEventType == BetterPlayerEventType.finished) {
       if (!_hasCompleted) {
         _hasCompleted = true;
         widget.onVideoCompleted?.call();

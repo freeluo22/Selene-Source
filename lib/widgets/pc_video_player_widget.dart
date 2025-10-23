@@ -20,6 +20,7 @@ class PcVideoPlayerWidget extends StatefulWidget {
   final int? totalEpisodes;
   final String? sourceName;
   final Function(bool isWebFullscreen)? onWebFullscreenChanged;
+  final bool live;
 
   const PcVideoPlayerWidget({
     super.key,
@@ -37,6 +38,7 @@ class PcVideoPlayerWidget extends StatefulWidget {
     this.totalEpisodes,
     this.sourceName,
     this.onWebFullscreenChanged,
+    this.live = false,
   });
 
   @override
@@ -177,14 +179,16 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
       // 可以在这里处理播放/暂停状态变化
     });
 
-    // 监听播放完成
-    _completedSubscription = _player!.stream.completed.listen((completed) {
-      if (!mounted) return;
-      if (completed && !_hasCompleted) {
-        _hasCompleted = true;
-        widget.onVideoCompleted?.call();
-      }
-    });
+    // 监听播放完成（live 模式下不监听）
+    if (!widget.live) {
+      _completedSubscription = _player!.stream.completed.listen((completed) {
+        if (!mounted) return;
+        if (completed && !_hasCompleted) {
+          _hasCompleted = true;
+          widget.onVideoCompleted?.call();
+        }
+      });
+    }
 
     // 监听加载完成
     _durationSubscription = _player!.stream.duration.listen((currentDuration) {
@@ -314,6 +318,7 @@ class _PcVideoPlayerWidgetState extends State<PcVideoPlayerWidget>
                   currentEpisodeIndex: widget.currentEpisodeIndex,
                   totalEpisodes: widget.totalEpisodes,
                   sourceName: widget.sourceName,
+                  live: widget.live,
                   onDLNAButtonPressed: (isFullscreen) {
                     if (isFullscreen) {
                       // 如果在全屏状态，设置标记并退出全屏

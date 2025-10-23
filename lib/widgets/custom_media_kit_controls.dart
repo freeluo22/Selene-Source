@@ -68,6 +68,7 @@ class CustomMediaKitControls extends StatefulWidget {
   final Function(bool isFullscreen)? onDLNAButtonPressed;
   final Function(bool isWebFullscreen)? onWebFullscreenChanged;
   final Function(VoidCallback)? onExitWebFullscreenCallbackReady;
+  final bool live;
 
   const CustomMediaKitControls({
     super.key,
@@ -88,6 +89,7 @@ class CustomMediaKitControls extends StatefulWidget {
     this.onDLNAButtonPressed,
     this.onWebFullscreenChanged,
     this.onExitWebFullscreenCallbackReady,
+    this.live = false,
   });
 
   @override
@@ -294,7 +296,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
   }
 
   void _onSwipeStart(DragStartDetails details) {
-    if (!mounted) return;
+    if (!mounted || widget.live) return;
 
     setState(() {
       _isSeekingViaSwipe = true;
@@ -307,7 +309,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
   }
 
   void _onSwipeUpdate(DragUpdateDetails details) {
-    if (!mounted || !_isSeekingViaSwipe || _screenSize == null) return;
+    if (!mounted || !_isSeekingViaSwipe || _screenSize == null || widget.live) return;
 
     final screenWidth = _screenSize!.width;
     final swipeDistance = details.globalPosition.dx - _swipeStartX;
@@ -327,7 +329,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
   }
 
   void _onSwipeEnd(DragEndDetails details) {
-    if (!mounted || !_isSeekingViaSwipe) return;
+    if (!mounted || !_isSeekingViaSwipe || widget.live) return;
 
     if (_dragPosition != null) {
       widget.player.seek(_dragPosition!);
@@ -739,6 +741,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
                       },
                       dragPosition: _dragPosition,
                       isSeekingViaSwipe: _isSeekingViaSwipe,
+                      live: widget.live,
                     ),
                   ),
                 ),
@@ -784,7 +787,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
                               size: effectiveFullscreen ? 28 : 24,
                             ),
                           ),
-                          if (!widget.isLastEpisode)
+                          if (!widget.isLastEpisode && !widget.live)
                             Transform.translate(
                               offset: const Offset(-8, 0),
                               child: HoverButton(
@@ -862,52 +865,55 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
                               ),
                             ),
                           ),
-                          Expanded(
-                            child: _buildPositionIndicator(),
-                          ),
-                          MouseRegion(
-                            key: _speedButtonKey,
-                            cursor: SystemMouseCursors.click,
-                            onEnter: (_) {
-                              setState(() {
-                                _isHoveringSpeedButton = true;
-                                _showSpeedMenu = true;
-                                _controlsVisible = true;
-                              });
-                              _hideTimer?.cancel();
-                            },
-                            onExit: (_) {
-                              setState(() {
-                                _isHoveringSpeedButton = false;
-                              });
-                              // 延迟检查是否需要隐藏菜单
-                              Future.delayed(const Duration(milliseconds: 100),
-                                  () {
-                                if (mounted &&
-                                    !_isHoveringSpeedButton &&
-                                    !_isHoveringSpeedMenu) {
-                                  setState(() {
-                                    _showSpeedMenu = false;
-                                  });
-                                  _startHideTimer();
-                                }
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: _isHoveringSpeedButton
-                                  ? BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.grey.withValues(alpha: 0.5),
-                                    )
-                                  : null,
-                              child: Icon(
-                                Icons.speed,
-                                color: Colors.white,
-                                size: effectiveFullscreen ? 22 : 20,
+                          if (!widget.live)
+                            Expanded(
+                              child: _buildPositionIndicator(),
+                            ),
+                          if (!widget.live)
+                            MouseRegion(
+                              key: _speedButtonKey,
+                              cursor: SystemMouseCursors.click,
+                              onEnter: (_) {
+                                setState(() {
+                                  _isHoveringSpeedButton = true;
+                                  _showSpeedMenu = true;
+                                  _controlsVisible = true;
+                                });
+                                _hideTimer?.cancel();
+                              },
+                              onExit: (_) {
+                                setState(() {
+                                  _isHoveringSpeedButton = false;
+                                });
+                                // 延迟检查是否需要隐藏菜单
+                                Future.delayed(const Duration(milliseconds: 100),
+                                    () {
+                                  if (mounted &&
+                                      !_isHoveringSpeedButton &&
+                                      !_isHoveringSpeedMenu) {
+                                    setState(() {
+                                      _showSpeedMenu = false;
+                                    });
+                                    _startHideTimer();
+                                  }
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: _isHoveringSpeedButton
+                                    ? BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.grey.withValues(alpha: 0.5),
+                                      )
+                                    : null,
+                                child: Icon(
+                                  Icons.speed,
+                                  color: Colors.white,
+                                  size: effectiveFullscreen ? 22 : 20,
+                                ),
                               ),
                             ),
-                          ),
+                          if (widget.live) const Spacer(),
                           // 网页全屏按钮（仅在非真全屏时显示）
                           if (!_isFullscreen)
                             HoverButton(
@@ -1291,6 +1297,7 @@ class CustomVideoProgressBar extends StatefulWidget {
   final Function(Duration)? onPositionUpdate;
   final Duration? dragPosition;
   final bool isSeekingViaSwipe;
+  final bool live;
 
   const CustomVideoProgressBar({
     super.key,
@@ -1301,6 +1308,7 @@ class CustomVideoProgressBar extends StatefulWidget {
     this.onPositionUpdate,
     this.dragPosition,
     this.isSeekingViaSwipe = false,
+    this.live = false,
   });
 
   @override
@@ -1336,29 +1344,34 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
 
     double value = 0.0;
     if (duration.inMilliseconds > 0) {
-      value = position.inMilliseconds / duration.inMilliseconds;
+      // live 模式下进度固定在最后
+      if (widget.live) {
+        value = 1.0;
+      } else {
+        value = position.inMilliseconds / duration.inMilliseconds;
+      }
     }
 
-    if (_isDragging) {
+    if (_isDragging && !widget.live) {
       value = _dragValue;
     }
 
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: widget.live ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (details) {
+        onHorizontalDragStart: widget.live ? null : (details) {
           _isDragging = true;
           widget.onDragStart?.call();
           _updateDragPosition(details.localPosition.dx, context);
         },
-        onHorizontalDragUpdate: (details) {
+        onHorizontalDragUpdate: widget.live ? null : (details) {
           if (_isDragging) {
             widget.onDragUpdate?.call();
             _updateDragPosition(details.localPosition.dx, context);
           }
         },
-        onHorizontalDragEnd: (details) {
+        onHorizontalDragEnd: widget.live ? null : (details) {
           if (_isDragging) {
             final seekPosition = Duration(
                 milliseconds: (_dragValue * duration.inMilliseconds).round());
@@ -1370,7 +1383,7 @@ class _CustomVideoProgressBarState extends State<CustomVideoProgressBar> {
             widget.onDragEnd?.call();
           }
         },
-        onTapDown: (details) {
+        onTapDown: widget.live ? null : (details) {
           widget.onDragStart?.call();
           _updateDragPosition(details.localPosition.dx, context);
           final seekPosition = Duration(
