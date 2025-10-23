@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/live_channel.dart';
 import '../services/live_channel_service.dart';
+import '../services/user_data_service.dart';
 import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
 import 'package:provider/provider.dart';
 import 'live_player_screen.dart';
+import '../widgets/live_preview_player.dart';
 
 class LiveScreen extends StatefulWidget {
   const LiveScreen({super.key});
@@ -18,15 +20,27 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedGroup = '全部';
-  final TextEditingController _urlController = TextEditingController();
-  final TextEditingController _uaController = TextEditingController();
-  String? _currentUA;
 
   @override
   void initState() {
     super.initState();
     _loadChannels();
     _loadCustomUA();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 每次页面显示时刷新预览
+    _refreshPreviews();
+  }
+
+  Future<void> _refreshPreviews() async {
+    final channels = _getFilteredChannels();
+    if (channels.isNotEmpty) {
+      // 异步生成预览，不阻塞 UI
+      LivePreviewService.generatePreviews(channels);
+    }
   }
 
   @override
@@ -65,6 +79,9 @@ class _LiveScreenState extends State<LiveScreen> {
             _errorMessage = '暂无频道，请导入频道源';
           }
         });
+        
+        // 加载完成后生成预览
+        _refreshPreviews();
       }
     } catch (e) {
       if (mounted) {
@@ -76,11 +93,12 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
-  Future<void> _importChannels() async {
-    final url = _urlController.text.trim();
+  Future<void> _fetchFromMoonTV() async {
+    // 获取 MoonTV 服务器地址
+    final serverUrl = await UserDataService.getServerUrl();
     
-    if (url.isEmpty) {
-      _showMessage('请输入频道源地址');
+    if (serverUrl == null || serverUrl.isEmpty) {
+      _showMessage('未配置 MoonTV 服务器地址');
       return;
     }
 
@@ -90,25 +108,19 @@ class _LiveScreenState extends State<LiveScreen> {
     });
 
     try {
-      final customUA = _uaController.text.trim();
-      await LiveChannelService.importFromUrl(
-        url,
-        customUA: customUA.isNotEmpty ? customUA : null,
-      );
+      await LiveChannelService.fetchFromMoonTV(serverUrl);
       await _loadChannels();
-      await _loadCustomUA();
       
       if (mounted) {
-        _showMessage('导入成功');
-        Navigator.pop(context); // 关闭导入对话框
+        _showMessage('从 MoonTV 获取成功');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = '导入失败: $e';
+          _errorMessage = '获取失败: $e';
           _isLoading = false;
         });
-        _showMessage('导入失败: $e');
+        _showMessage('获取失败: $e');
       }
     }
   }
@@ -580,19 +592,12 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // UA 设置按钮
-          if (_currentUA != null && _currentUA!.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.settings),
-              color: const Color(0xFF3498DB),
-              tooltip: '已设置自定义 UA',
-              onPressed: _showUASettingsDialog,
-            ),
-          // 导入按钮
+          // 从 MoonTV 获取按钮
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.refresh),
             color: const Color(0xFF27ae60),
-            onPressed: _showImportDialog,
+            tooltip: '刷新直播源',
+            onPressed: _fetchFromMoonTV,
           ),
         ],
       ),
@@ -646,7 +651,7 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: _channelGroups.isEmpty ? _showImportDialog : _loadChannels,
+            onPressed: _fetchFromMoonTV,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF27ae60),
               shape: RoundedRectangleBorder(
@@ -654,7 +659,7 @@ class _LiveScreenState extends State<LiveScreen> {
               ),
             ),
             child: Text(
-              _channelGroups.isEmpty ? '导入频道源' : '重试',
+              '从 MoonTV 获取',
               style: FontUtils.poppins(color: Colors.white),
             ),
           ),
@@ -679,17 +684,49 @@ class _LiveScreenState extends State<LiveScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: channels.length,
-      itemBuilder: (context, index) {
-        final channel = channels[index];
-        return _buildChannelItem(channel, themeService);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 根据屏幕宽度计算列数
+        int crossAxisCount;
+        double childAspectRatio;
+        
+        if (constraints.maxWidth < 600) {
+          // 手机：2列
+          crossAxisCount = 2;
+          childAspectRatio = 0.75;
+        } else if (constraints.maxWidth < 900) {
+          // 平板竖屏：3列
+          crossAxisCount = 3;
+          childAspectRatio = 0.8;
+        } else if (constraints.maxWidth < 1200) {
+          // 平板横屏：4列
+          crossAxisCount = 4;
+          childAspectRatio = 0.85;
+        } else {
+          // PC：5列
+          crossAxisCount = 5;
+          childAspectRatio = 0.9;
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: channels.length,
+          itemBuilder: (context, index) {
+            final channel = channels[index];
+            return _buildChannelCard(channel, themeService);
+          },
+        );
       },
     );
   }
 
-  Widget _buildChannelItem(LiveChannel channel, ThemeService themeService) {
+  Widget _buildChannelCard(LiveChannel channel, ThemeService themeService) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -700,8 +737,6 @@ class _LiveScreenState extends State<LiveScreen> {
         ).then((_) => _loadChannels()); // 返回时刷新收藏状态
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: themeService.isDarkMode
               ? const Color(0xFF1e1e1e)
@@ -717,69 +752,132 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 频道图标
-            if (channel.logo.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  channel.logo,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildDefaultIcon(themeService);
-                  },
-                ),
-              )
-            else
-              _buildDefaultIcon(themeService),
-            const SizedBox(width: 12),
-            // 频道信息
+            // 频道预览图/图标
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Text(
-                    channel.title,
-                    style: FontUtils.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: themeService.isDarkMode
-                          ? Colors.white
-                          : const Color(0xFF2c3e50),
+                  // 背景图片或直播预览
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: LivePreviewPlayer(
+                      channel: channel,
+                      defaultBuilder: (context) =>
+                          _buildDefaultPreview(themeService),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${channel.group} · ${channel.uris.length} 个源',
-                    style: FontUtils.poppins(
-                      fontSize: 12,
-                      color: themeService.isDarkMode
-                          ? const Color(0xFF999999)
-                          : const Color(0xFF7f8c8d),
+                  // 渐变遮罩
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                          stops: const [0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 收藏按钮
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () async {
+                        await LiveChannelService.toggleFavorite(channel.id);
+                        _loadChannels();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          channel.isFavorite
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: channel.isFavorite
+                              ? const Color(0xFFe74c3c)
+                              : Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 频道名称（叠加在图片上）
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: Text(
+                      channel.title,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withOpacity(0.8),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
-            // 收藏按钮
-            IconButton(
-              icon: Icon(
-                channel.isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: channel.isFavorite
-                    ? const Color(0xFFe74c3c)
-                    : themeService.isDarkMode
-                        ? const Color(0xFF666666)
-                        : const Color(0xFF95a5a6),
+            // 底部信息栏
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: themeService.isDarkMode
+                    ? const Color(0xFF2a2a2a)
+                    : const Color(0xFFf5f5f5),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
+                ),
               ),
-              onPressed: () async {
-                await LiveChannelService.toggleFavorite(channel.id);
-                _loadChannels();
-              },
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.play_circle_outline,
+                    size: 14,
+                    color: themeService.isDarkMode
+                        ? const Color(0xFF999999)
+                        : const Color(0xFF7f8c8d),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${channel.uris.length} 个源',
+                      style: FontUtils.poppins(
+                        fontSize: 11,
+                        color: themeService.isDarkMode
+                            ? const Color(0xFF999999)
+                            : const Color(0xFF7f8c8d),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -787,22 +885,33 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
-  Widget _buildDefaultIcon(ThemeService themeService) {
+  Widget _buildDefaultPreview(ThemeService themeService) {
     return Container(
-      width: 60,
-      height: 60,
+      width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
-        color: themeService.isDarkMode
-            ? const Color(0xFF2a2a2a)
-            : const Color(0xFFf5f5f5),
-        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: themeService.isDarkMode
+              ? [
+                  const Color(0xFF2a2a2a),
+                  const Color(0xFF1e1e1e),
+                ]
+              : [
+                  const Color(0xFFe0e0e0),
+                  const Color(0xFFf5f5f5),
+                ],
+        ),
       ),
-      child: Icon(
-        Icons.tv,
-        size: 32,
-        color: themeService.isDarkMode
-            ? const Color(0xFF666666)
-            : const Color(0xFF95a5a6),
+      child: Center(
+        child: Icon(
+          Icons.tv,
+          size: 48,
+          color: themeService.isDarkMode
+              ? const Color(0xFF666666)
+              : const Color(0xFF95a5a6),
+        ),
       ),
     );
   }

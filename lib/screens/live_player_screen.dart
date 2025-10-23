@@ -180,6 +180,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
         key: ValueKey('${_currentChannel.id}_$_currentSourceIndex'),
         url: videoUrl,
         videoTitle: _currentChannel.title,
+        onBackPressed: () => Navigator.pop(context),
         onControllerCreated: (controller) {
           _pcVideoPlayerController = controller;
         },
@@ -189,6 +190,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
         key: ValueKey('${_currentChannel.id}_$_currentSourceIndex'),
         url: videoUrl,
         videoTitle: _currentChannel.title,
+        onBackPressed: () => Navigator.pop(context),
         onControllerCreated: (controller) {
           _mobileVideoPlayerController = controller;
         },
@@ -220,12 +222,6 @@ class _LivePlayerScreenState extends State<LivePlayerScreen> {
         ),
         child: Row(
           children: [
-            // 返回按钮
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            const SizedBox(width: 8),
             // 频道信息
             Expanded(
               child: Column(

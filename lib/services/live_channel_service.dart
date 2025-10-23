@@ -7,7 +7,6 @@ class LiveChannelService {
   static const String _channelsKey = 'live_channels';
   static const String _sourceUrlKey = 'live_source_url';
   static const String _favoritesKey = 'live_favorites';
-  static const String _customUAKey = 'live_custom_ua';
 
   // 获取频道列表
   static Future<List<LiveChannel>> getChannels() async {
@@ -54,175 +53,56 @@ class LiveChannelService {
     await prefs.setString(_sourceUrlKey, url);
   }
 
-  // 从URL导入频道
-  static Future<List<LiveChannel>> importFromUrl(String url, {String? customUA}) async {
+  // 从 MoonTV API 获取直播源
+  static Future<List<LiveChannel>> fetchFromMoonTV(String baseUrl) async {
     try {
-      final headers = <String, String>{};
-      
-      // 如果提供了自定义 UA，使用它；否则使用保存的 UA
-      final ua = customUA ?? await getCustomUA();
-      if (ua != null && ua.isNotEmpty) {
-        headers['User-Agent'] = ua;
-      }
-      
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final url = '$baseUrl/api/live/sources';
+      final response = await http.get(Uri.parse(url));
       
       if (response.statusCode != 200) {
         throw Exception('请求失败: ${response.statusCode}');
       }
 
-      final content = utf8.decode(response.bodyBytes);
-      final channels = _parseChannels(content);
+      final data = json.decode(utf8.decode(response.bodyBytes));
+      
+      if (data['success'] != true || data['data'] == null) {
+        throw Exception('API 返回数据格式错误');
+      }
+
+      final List<dynamic> sources = data['data'];
+      final channels = <LiveChannel>[];
+      
+      for (var i = 0; i < sources.length; i++) {
+        final source = sources[i];
+        
+        // 解析每个直播源
+        final channel = LiveChannel(
+          id: i,
+          name: source['name'] ?? '',
+          title: source['name'] ?? '',
+          logo: source['logo'] ?? '',
+          uris: [source['url'] ?? ''],
+          group: source['group'] ?? '未分组',
+          number: source['number'] ?? -1,
+        );
+        
+        channels.add(channel);
+      }
       
       if (channels.isEmpty) {
         throw Exception('未找到有效频道');
       }
 
       await saveChannels(channels);
-      await saveSourceUrl(url);
-      
-      // 如果提供了自定义 UA，保存它
-      if (customUA != null && customUA.isNotEmpty) {
-        await saveCustomUA(customUA);
-      }
+      await saveSourceUrl(baseUrl);
       
       return channels;
     } catch (e) {
-      throw Exception('导入失败: $e');
+      throw Exception('从 MoonTV 获取失败: $e');
     }
   }
 
-  // 解析频道内容（支持 m3u 和 txt 格式）
-  static List<LiveChannel> _parseChannels(String content) {
-    if (content.trim().startsWith('#EXTM3U')) {
-      return _parseM3u(content);
-    } else if (content.trim().startsWith('[')) {
-      return _parseJson(content);
-    } else {
-      return _parseTxt(content);
-    }
-  }
 
-  // 解析 M3U 格式
-  static List<LiveChannel> _parseM3u(String content) {
-    final lines = content.split('\n');
-    final channels = <LiveChannel>[];
-    final channelMap = <String, List<LiveChannel>>{};
-    
-    LiveChannel? currentChannel;
-    int id = 0;
-
-    for (var line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-
-      if (trimmed.startsWith('#EXTINF')) {
-        final nameMatch = RegExp(r'tvg-name="([^"]+)"').firstMatch(trimmed);
-        final logoMatch = RegExp(r'tvg-logo="([^"]+)"').firstMatch(trimmed);
-        final numMatch = RegExp(r'tvg-chno="([^"]+)"').firstMatch(trimmed);
-        final groupMatch = RegExp(r'group-title="([^"]+)"').firstMatch(trimmed);
-        
-        final parts = trimmed.split(',');
-        final title = parts.length > 1 ? parts.last.trim() : '';
-        final name = nameMatch?.group(1)?.trim() ?? title;
-        
-        currentChannel = LiveChannel(
-          id: id++,
-          name: name,
-          title: title,
-          logo: logoMatch?.group(1)?.trim() ?? '',
-          uris: [],
-          group: groupMatch?.group(1)?.trim() ?? '未分组',
-          number: int.tryParse(numMatch?.group(1)?.trim() ?? '') ?? -1,
-        );
-      } else if (!trimmed.startsWith('#') && currentChannel != null) {
-        final key = '${currentChannel.group}_${currentChannel.name}';
-        if (!channelMap.containsKey(key)) {
-          channelMap[key] = [currentChannel];
-        }
-        channelMap[key]!.last.uris.add(trimmed);
-      }
-    }
-
-    // 合并相同频道的多个源
-    for (var entry in channelMap.entries) {
-      final allUris = entry.value.expand((c) => c.uris).toList();
-      final channel = entry.value.first.copyWith(uris: allUris);
-      channels.add(channel);
-    }
-
-    return channels;
-  }
-
-  // 解析 TXT 格式
-  static List<LiveChannel> _parseTxt(String content) {
-    final lines = content.split('\n');
-    final channels = <LiveChannel>[];
-    final channelMap = <String, List<String>>{};
-    String currentGroup = '未分组';
-    int id = 0;
-
-    for (var line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-
-      if (trimmed.contains('#genre#')) {
-        currentGroup = trimmed.split(',').first.trim();
-      } else if (trimmed.contains(',')) {
-        final parts = trimmed.split(',');
-        final title = parts.first.trim();
-        final uris = parts.skip(1).map((e) => e.trim()).toList();
-        
-        final key = '${currentGroup}_$title';
-        if (!channelMap.containsKey(key)) {
-          channelMap[key] = [];
-        }
-        channelMap[key]!.addAll(uris);
-      }
-    }
-
-    for (var entry in channelMap.entries) {
-      final parts = entry.key.split('_');
-      final group = parts.first;
-      final title = parts.skip(1).join('_');
-      
-      channels.add(LiveChannel(
-        id: id++,
-        name: title,
-        title: title,
-        logo: '',
-        uris: entry.value,
-        group: group,
-      ));
-    }
-
-    return channels;
-  }
-
-  // 解析 JSON 格式
-  static List<LiveChannel> _parseJson(String content) {
-    try {
-      final List<dynamic> decoded = json.decode(content);
-      return decoded.asMap().entries.map((entry) {
-        final data = entry.value;
-        return LiveChannel(
-          id: entry.key,
-          name: data['name'] ?? '',
-          title: data['title'] ?? data['name'] ?? '',
-          logo: data['logo'] ?? '',
-          uris: List<String>.from(data['uris'] ?? []),
-          group: data['group'] ?? '未分组',
-          number: data['number'] ?? -1,
-          headers: data['headers'] != null
-              ? Map<String, String>.from(data['headers'])
-              : null,
-        );
-      }).toList();
-    } catch (e) {
-      print('解析 JSON 失败: $e');
-      return [];
-    }
-  }
 
   // 按分组获取频道
   static Future<List<LiveChannelGroup>> getChannelsByGroup() async {
@@ -283,21 +163,5 @@ class LiveChannelService {
     return channels.where((c) => c.isFavorite).toList();
   }
 
-  // 获取自定义 UA
-  static Future<String?> getCustomUA() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_customUAKey);
-  }
 
-  // 保存自定义 UA
-  static Future<void> saveCustomUA(String ua) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_customUAKey, ua);
-  }
-
-  // 清除自定义 UA
-  static Future<void> clearCustomUA() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_customUAKey);
-  }
 }
