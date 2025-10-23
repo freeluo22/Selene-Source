@@ -34,12 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBottomNavIndex = 0;
   String _selectedTopTab = '首页';
   late PageController _pageController;
+  late PageController _bottomNavPageController;
 
   @override
   void initState() {
     super.initState();
     // 初始化 PageController，默认显示首页（索引0）
     _pageController = PageController(initialPage: 0);
+    // 初始化底栏 PageController
+    _bottomNavPageController = PageController(initialPage: 0);
     // 进入首页时直接刷新播放记录和收藏夹缓存
     _refreshCacheOnHomeEnter();
     // 检查应用更新
@@ -72,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _bottomNavPageController.dispose();
     super.dispose();
   }
 
@@ -379,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return MainLayout(
-      content: _buildCurrentPage(),
+      content: _buildBottomNavPageView(),
       currentBottomNavIndex: _currentBottomNavIndex,
       onBottomNavChanged: _onBottomNavChanged,
       selectedTopTab: _selectedTopTab,
@@ -389,22 +393,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 根据当前页面索引动态构建页面内容
-  Widget _buildCurrentPage() {
-    switch (_currentBottomNavIndex) {
-      case 0:
-        return _buildHomeContentWithPageView();
-      case 1:
-        return const MovieScreen();
-      case 2:
-        return const TvScreen();
-      case 3:
-        return const AnimeScreen();
-      case 4:
-        return const ShowScreen();
-      default:
-        return const AnimeScreen();
-    }
+  /// 构建底栏 PageView，支持左右滑动切换
+  Widget _buildBottomNavPageView() {
+    return PageView(
+      controller: _bottomNavPageController,
+      onPageChanged: (index) {
+        if (_currentBottomNavIndex != index) {
+          setState(() {
+            _currentBottomNavIndex = index;
+          });
+        }
+      },
+      children: [
+        _buildHomeContentWithPageView(),
+        const MovieScreen(),
+        const TvScreen(),
+        const AnimeScreen(),
+        const ShowScreen(),
+      ],
+    );
   }
 
   /// 处理底部导航栏切换
@@ -417,6 +424,13 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _currentBottomNavIndex = index;
     });
+
+    // 使用动画切换到对应页面
+    _bottomNavPageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   /// 处理顶部标签切换
@@ -478,6 +492,20 @@ class _HomeScreenState extends State<HomeScreen> {
       // 切换到首页标签
       _selectedTopTab = '首页';
     });
+
+    // 使用动画切换到首页
+    _bottomNavPageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+
+    // 同时切换顶部标签到首页
+    _pageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   /// 处理视频卡片点击
