@@ -6,7 +6,6 @@ import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
 import 'package:provider/provider.dart';
 import 'live_player_screen.dart';
-import '../widgets/live_preview_player.dart';
 
 class LiveScreen extends StatefulWidget {
   const LiveScreen({super.key});
@@ -569,12 +568,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
                     ),
-                    child: LivePreviewPlayer(
-                      channel: channel,
-                      defaultBuilder: (context) =>
-                          _buildDefaultPreview(themeService),
-                      enableLivePreview: true, // 默认关闭实时预览，使用 Logo
-                    ),
+                    child: _buildChannelLogo(channel, themeService),
                   ),
                   Positioned.fill(
                     child: Container(
@@ -685,6 +679,45 @@ class _LiveScreenState extends State<LiveScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildChannelLogo(LiveChannel channel, ThemeService themeService) {
+    // 如果有台标，显示台标
+    if (channel.logo.isNotEmpty) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: themeService.isDarkMode
+                ? [
+                    const Color(0xFF2a2a2a),
+                    const Color(0xFF1e1e1e),
+                  ]
+                : [
+                    const Color(0xFFe0e0e0),
+                    const Color(0xFFf5f5f5),
+                  ],
+          ),
+        ),
+        child: Image.network(
+          channel.logo,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildDefaultPreview(themeService);
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildDefaultPreview(themeService);
+          },
+        ),
+      );
+    }
+    // 没有台标，显示默认图标
+    return _buildDefaultPreview(themeService);
   }
 
   Widget _buildDefaultPreview(ThemeService themeService) {
