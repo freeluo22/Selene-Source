@@ -2,8 +2,8 @@ import 'dart:math' as math;
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../widgets/mobile_video_player_widget.dart';
-import '../widgets/pc_video_player_widget.dart';
+import '../widgets/video_player_surface.dart';
+import '../widgets/video_player_widget.dart';
 import '../widgets/video_card.dart';
 import '../services/api_service.dart';
 import '../services/m3u8_service.dart';
@@ -88,11 +88,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   // 所有源测速结果
   Map<String, SourceSpeed> allSourcesSpeed = {};
 
-  // MobileVideoPlayerWidget 的控制器
-  MobileVideoPlayerWidgetController? _mobileVideoPlayerController;
-
-  // PcVideoPlayerWidget 的控制器
-  PcVideoPlayerWidgetController? _pcVideoPlayerController;
+  // VideoPlayerWidget 的控制器
+  VideoPlayerWidgetController? _videoPlayerController;
 
   // 收藏状态
   bool _isFavorite = false;
@@ -436,8 +433,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     // 通知播放器控件退出网页全屏
     // 播放器控件会通过 onWebFullscreenChanged 回调来更新 _isWebFullscreen 状态
-    if (_pcVideoPlayerController != null) {
-      _pcVideoPlayerController!.exitWebFullscreen();
+    if (_videoPlayerController != null) {
+      _videoPlayerController!.exitWebFullscreen();
     }
   }
 
@@ -456,15 +453,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         duration = _dlnaCurrentDuration;
       } else {
         // 本地播放：根据设备类型从对应播放器获取
-        if (DeviceUtils.isPC()) {
-          if (_pcVideoPlayerController == null) return;
-          currentPosition = _pcVideoPlayerController!.currentPosition;
-          duration = _pcVideoPlayerController!.duration;
-        } else {
-          if (_mobileVideoPlayerController == null) return;
-          currentPosition = _mobileVideoPlayerController!.currentPosition;
-          duration = _mobileVideoPlayerController!.duration;
-        }
+        if (_videoPlayerController == null) return;
+        currentPosition = _videoPlayerController!.currentPosition;
+        duration = _videoPlayerController!.duration;
       }
 
       if (currentPosition == null || duration == null) return;
@@ -644,13 +635,8 @@ class _PlayerScreenState extends State<PlayerScreen>
             startAt: startAt);
       } else {
         // 本地播放：根据设备类型调用对应播放器的 updateDataSource
-        if (DeviceUtils.isPC()) {
-          await _pcVideoPlayerController?.updateDataSource(finalUrl,
-              startAt: startAt);
-        } else {
-          await _mobileVideoPlayerController?.updateDataSource(finalUrl,
-              startAt: startAt);
-        }
+        await _videoPlayerController?.updateDataSource(finalUrl,
+            startAt: startAt);
       }
     } catch (e) {
       // 静默处理错误
@@ -660,11 +646,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 跳转到指定进度
   Future<void> seekToProgress(Duration position) async {
     try {
-      if (DeviceUtils.isPC()) {
-        await _pcVideoPlayerController?.seekTo(position);
-      } else {
-        await _mobileVideoPlayerController?.seekTo(position);
-      }
+      await _videoPlayerController?.seekTo(position);
     } catch (e) {
       // 静默处理错误
     }
@@ -681,12 +663,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       // 投屏状态：从 DLNA 播放器获取
       return _dlnaCurrentPosition;
     } else {
-      // 本地播放：根据设备类型从对应播放器获取
-      if (DeviceUtils.isPC()) {
-        return _pcVideoPlayerController?.currentPosition;
-      } else {
-        return _mobileVideoPlayerController?.currentPosition;
-      }
+      return _videoPlayerController?.currentPosition;
     }
   }
 
@@ -709,34 +686,16 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 添加视频播放进度监听器
   void _addVideoProgressListener() {
-    if (DeviceUtils.isPC()) {
-      if (_pcVideoPlayerController != null) {
-        // 添加进度监听器
-        _pcVideoPlayerController!.addProgressListener(_onVideoProgressUpdate);
-      }
-    } else {
-      if (_mobileVideoPlayerController != null) {
-        // 添加进度监听器
-        _mobileVideoPlayerController!
-            .addProgressListener(_onVideoProgressUpdate);
-      }
+    if (_videoPlayerController != null) {
+      // 添加进度监听器
+      _videoPlayerController!.addProgressListener(_onVideoProgressUpdate);
     }
   }
 
   /// 移除视频播放进度监听器
   void _removeVideoProgressListener() {
-    if (DeviceUtils.isPC()) {
-      if (_pcVideoPlayerController != null) {
-        // 移除进度监听器
-        _pcVideoPlayerController!
-            .removeProgressListener(_onVideoProgressUpdate);
-      }
-    } else {
-      if (_mobileVideoPlayerController != null) {
-        // 移除进度监听器
-        _mobileVideoPlayerController!
-            .removeProgressListener(_onVideoProgressUpdate);
-      }
+    if (_videoPlayerController != null) {
+      _videoPlayerController!.removeProgressListener(_onVideoProgressUpdate);
     }
   }
 
@@ -1031,41 +990,21 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     return Stack(
       children: [
-        if (!_isCasting && !isPC)
-          MobileVideoPlayerWidget(
+        if (!_isCasting)
+          VideoPlayerWidget(
+            surface:
+                isPC ? VideoPlayerSurface.desktop : VideoPlayerSurface.mobile,
             url: null,
             onBackPressed: _onBackPressed,
             onControllerCreated: (controller) {
-              _mobileVideoPlayerController = controller;
+              _videoPlayerController = controller;
             },
             onReady: _onVideoPlayerReady,
             onNextEpisode: _onNextEpisode,
             onVideoCompleted: _onVideoCompleted,
             onPause: () {
               // 暂停时保存进度
-              _saveProgress(force: true, scene: '移动端暂停');
-            },
-            isLastEpisode: currentDetail != null &&
-                currentEpisodeIndex >= currentDetail!.episodes.length - 1,
-            onCastStarted: _onCastStarted,
-            videoTitle: videoTitle,
-            currentEpisodeIndex: currentEpisodeIndex,
-            totalEpisodes: totalEpisodes,
-            sourceName: currentDetail?.sourceName ?? currentSource,
-          ),
-        if (!_isCasting && isPC)
-          PcVideoPlayerWidget(
-            url: null,
-            onBackPressed: _onBackPressed,
-            onControllerCreated: (controller) {
-              _pcVideoPlayerController = controller;
-            },
-            onReady: _onVideoPlayerReady,
-            onNextEpisode: _onNextEpisode,
-            onVideoCompleted: _onVideoCompleted,
-            onPause: () {
-              // 暂停时保存进度
-              _saveProgress(force: true, scene: 'PC端暂停');
+              _saveProgress(force: true, scene: '暂停');
             },
             isLastEpisode: currentDetail != null &&
                 currentEpisodeIndex >= currentDetail!.episodes.length - 1,
@@ -1115,22 +1054,14 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 投屏开始回调
   void _onCastStarted(dynamic device) {
     // 保存当前播放位置
-    final currentPos = DeviceUtils.isPC()
-        ? _pcVideoPlayerController?.currentPosition
-        : _mobileVideoPlayerController?.currentPosition;
+    final currentPos = _videoPlayerController?.currentPosition;
 
     setState(() {
       _isCasting = true;
       _dlnaDevice = device;
       _castStartPosition = currentPos;
-      // 销毁视频播放器
-      if (DeviceUtils.isPC()) {
-        _pcVideoPlayerController?.dispose();
-        _pcVideoPlayerController = null;
-      } else {
-        _mobileVideoPlayerController?.dispose();
-        _mobileVideoPlayerController = null;
-      }
+      _videoPlayerController?.dispose();
+      _videoPlayerController = null;
     });
   }
 
@@ -1494,14 +1425,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
 
     // 本地播放：根据设备类型暂停对应播放器
-    if (DeviceUtils.isPC()) {
-      if (_pcVideoPlayerController?.isPlaying == true) {
-        _pcVideoPlayerController?.pause();
-      }
-    } else {
-      if (_mobileVideoPlayerController?.isPlaying == true) {
-        _mobileVideoPlayerController?.pause();
-      }
+    if (_videoPlayerController?.isPlaying == true) {
+      _videoPlayerController?.pause();
     }
 
     // 跳转到新的播放页，只传递title参数
@@ -2573,7 +2498,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 恢复原始的系统UI样式
     SystemChrome.setSystemUIOverlayStyle(_originalStyle);
     // 销毁播放器
-    _mobileVideoPlayerController?.dispose();
+    _videoPlayerController?.dispose();
     // 释放滚动控制器
     _episodesScrollController.dispose();
     _sourcesScrollController.dispose();

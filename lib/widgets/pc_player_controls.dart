@@ -49,7 +49,7 @@ class _HoverButtonState extends State<HoverButton> {
   }
 }
 
-class CustomMediaKitControls extends StatefulWidget {
+class PCPlayerControls extends StatefulWidget {
   final VideoState state;
   final Player player;
   final VoidCallback? onBackPressed;
@@ -70,7 +70,7 @@ class CustomMediaKitControls extends StatefulWidget {
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
 
-  const CustomMediaKitControls({
+  const PCPlayerControls({
     super.key,
     required this.state,
     required this.player,
@@ -94,10 +94,10 @@ class CustomMediaKitControls extends StatefulWidget {
   });
 
   @override
-  State<CustomMediaKitControls> createState() => _CustomMediaKitControlsState();
+  State<PCPlayerControls> createState() => _PCPlayerControlsState();
 }
 
-class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
+class _PCPlayerControlsState extends State<PCPlayerControls> {
   Timer? _hideTimer;
   bool _controlsVisible = true;
   Size? _screenSize;
@@ -169,7 +169,7 @@ class _CustomMediaKitControlsState extends State<CustomMediaKitControls> {
   }
 
   @override
-  void didUpdateWidget(CustomMediaKitControls oldWidget) {
+  void didUpdateWidget(PCPlayerControls oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 当 widget 更新时，尝试同步全屏状态
     // 使用 try-catch 避免在不安全的时机访问 InheritedWidget

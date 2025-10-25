@@ -3,6 +3,7 @@ import '../models/live_channel.dart';
 import '../models/live_source.dart';
 import '../services/api_service.dart';
 import '../utils/font_utils.dart';
+import '../utils/device_utils.dart';
 import '../services/theme_service.dart';
 import 'package:provider/provider.dart';
 import 'live_player_screen.dart';
@@ -590,8 +591,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _buildTopBar(ThemeService themeService) {
-    final visibleGroups = ['全部'];
-    final moreGroups = _channelGroups.map((g) => g.name).toList();
+    final allGroups = ['全部', ..._channelGroups.map((g) => g.name)];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -602,101 +602,91 @@ class _LiveScreenState extends State<LiveScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                // 显示"全部"
-                ...visibleGroups.map((group) {
-                  final isSelected = _selectedGroup == group;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedGroup = group;
-                      });
-                      _scrollToTop();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF27ae60)
-                            : themeService.isDarkMode
-                                ? const Color(0xFF2a2a2a)
-                                : const Color(0xFFf5f5f5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        group,
-                        style: FontUtils.poppins(
-                          fontSize: 12,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w400,
-                          color: isSelected
-                              ? Colors.white
-                              : themeService.isDarkMode
-                                  ? const Color(0xFFb0b0b0)
-                                  : const Color(0xFF7f8c8d),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-                // 更多按钮
-                if (moreGroups.isNotEmpty)
-                  GestureDetector(
-                    onTap: () =>
-                        _showMoreGroupsBottomSheet(moreGroups, themeService),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: themeService.isDarkMode
-                            ? const Color(0xFF2a2a2a)
-                            : const Color(0xFFf5f5f5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: themeService.isDarkMode
-                              ? const Color(0xFF333333)
-                              : const Color(0xFFe0e0e0),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '更多',
-                            style: FontUtils.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: themeService.isDarkMode
-                                  ? const Color(0xFFb0b0b0)
-                                  : const Color(0xFF7f8c8d),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: themeService.isDarkMode
-                                ? const Color(0xFFb0b0b0)
-                                : const Color(0xFF7f8c8d),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+          // "全部"按钮
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedGroup = '全部';
+              });
+              _scrollToTop();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: _selectedGroup == '全部'
+                    ? const Color(0xFF27ae60)
+                    : themeService.isDarkMode
+                        ? const Color(0xFF2a2a2a)
+                        : const Color(0xFFf5f5f5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '全部',
+                style: FontUtils.poppins(
+                  fontSize: 12,
+                  fontWeight: _selectedGroup == '全部'
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  color: _selectedGroup == '全部'
+                      ? Colors.white
+                      : themeService.isDarkMode
+                          ? const Color(0xFFb0b0b0)
+                          : const Color(0xFF7f8c8d),
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          // "更多"按钮
+          GestureDetector(
+            onTap: () => _showMoreGroupsBottomSheet(
+                allGroups.where((g) => g != '全部').toList(), themeService),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: themeService.isDarkMode
+                    ? const Color(0xFF2a2a2a)
+                    : const Color(0xFFf5f5f5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: themeService.isDarkMode
+                      ? const Color(0xFF333333)
+                      : const Color(0xFFe0e0e0),
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '更多',
+                    style: FontUtils.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: themeService.isDarkMode
+                          ? const Color(0xFFb0b0b0)
+                          : const Color(0xFF7f8c8d),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: themeService.isDarkMode
+                        ? const Color(0xFFb0b0b0)
+                        : const Color(0xFF7f8c8d),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
           // 当前源名称
           if (_currentSource != null)
             GestureDetector(
@@ -840,40 +830,22 @@ class _LiveScreenState extends State<LiveScreen> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount;
-        // 卡片长宽比为 2:1，加上标题高度约40，计算整体比例
-        double childAspectRatio;
+    // 非 PC 平台直接使用 2 列，PC 平台根据宽度计算列数
+    final int crossAxisCount = DeviceUtils.getLiveChannelColumnCount(context);
+    const double childAspectRatio = 1.5;
 
-        if (constraints.maxWidth < 600) {
-          crossAxisCount = 2;
-          childAspectRatio = 1.5;
-        } else if (constraints.maxWidth < 900) {
-          crossAxisCount = 3;
-          childAspectRatio = 1.5;
-        } else if (constraints.maxWidth < 1200) {
-          crossAxisCount = 4;
-          childAspectRatio = 1.5;
-        } else {
-          crossAxisCount = 5;
-          childAspectRatio = 1.5;
-        }
-
-        return GridView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: childAspectRatio,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: channels.length,
-          itemBuilder: (context, index) {
-            return _buildChannelCard(channels[index], themeService);
-          },
-        );
+    return GridView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: childAspectRatio,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: channels.length,
+      itemBuilder: (context, index) {
+        return _buildChannelCard(channels[index], themeService);
       },
     );
   }
@@ -966,21 +938,35 @@ class _LiveScreenState extends State<LiveScreen> {
                     const Color(0xFF1e1e1e),
                   ]
                 : [
-                    const Color(0xFFffffff),
-                    const Color(0xFFf8f9fa),
+                    const Color(0xFFf0f4f8),
+                    const Color(0xFFe8eef3),
                   ],
           ),
         ),
-        child: Image.network(
-          channel.logo,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return _buildDefaultPreview(themeService);
-          },
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _buildDefaultPreview(themeService);
-          },
+        child: Container(
+          decoration: BoxDecoration(
+            // 浅色模式下添加淡淡的阴影，增强白色 logo 的可见度
+            boxShadow: themeService.isDarkMode
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+          ),
+          child: Image.network(
+            channel.logo,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildDefaultPreview(themeService);
+            },
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return _buildDefaultPreview(themeService);
+            },
+          ),
         ),
       );
     }
@@ -1002,8 +988,8 @@ class _LiveScreenState extends State<LiveScreen> {
                   const Color(0xFF1e1e1e),
                 ]
               : [
-                  const Color(0xFFffffff),
-                  const Color(0xFFf8f9fa),
+                  const Color(0xFFf0f4f8),
+                  const Color(0xFFe8eef3),
                 ],
         ),
       ),
@@ -1013,7 +999,7 @@ class _LiveScreenState extends State<LiveScreen> {
           size: 48,
           color: themeService.isDarkMode
               ? const Color(0xFF666666)
-              : const Color(0xFFadb5bd),
+              : const Color(0xFF95a5b0),
         ),
       ),
     );

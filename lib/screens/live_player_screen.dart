@@ -1,12 +1,12 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/video_player_surface.dart';
+import '../widgets/video_player_widget.dart';
 import '../models/live_channel.dart';
 import '../models/live_source.dart';
 import '../models/epg_program.dart';
 import '../services/api_service.dart';
-import '../widgets/mobile_video_player_widget.dart';
-import '../widgets/pc_video_player_widget.dart';
 import '../utils/device_utils.dart';
 import '../utils/font_utils.dart';
 import '../services/theme_service.dart';
@@ -43,8 +43,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   late bool _isPortraitTablet;
 
   // 播放器控制器
-  MobileVideoPlayerWidgetController? _mobileVideoPlayerController;
-  PcVideoPlayerWidgetController? _pcVideoPlayerController;
+  VideoPlayerWidgetController? _videoPlayerController;
 
   // 播放器的 GlobalKey
   final GlobalKey _playerKey = GlobalKey();
@@ -202,8 +201,8 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
     }
     // 通知播放器控件退出网页全屏
     // 播放器控件会通过 onWebFullscreenChanged 回调来更新 _isWebFullscreen 状态
-    if (_pcVideoPlayerController != null) {
-      _pcVideoPlayerController!.exitWebFullscreen();
+    if (_videoPlayerController != null) {
+      _videoPlayerController!.exitWebFullscreen();
     }
   }
 
@@ -495,48 +494,31 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
   Widget _buildPlayerWidget() {
     final videoUrl = _currentChannel.url;
 
-    if (DeviceUtils.isPC()) {
-      return PcVideoPlayerWidget(
-        key: ValueKey(_currentChannel.id),
-        url: videoUrl,
-        headers: <String, String>{
-          'User-Agent': _currentSource.ua.isNotEmpty
-              ? _currentSource.ua
-              : 'AptvPlayer/1.4.10',
-        },
-        videoTitle: _currentChannel.name,
-        onBackPressed: _isWebFullscreen
-            ? _exitWebFullscreen
-            : () => Navigator.pop(context),
-        onControllerCreated: (controller) {
-          _pcVideoPlayerController = controller;
-        },
-        onWebFullscreenChanged: (isWebFullscreen) {
-          setState(() {
-            _isWebFullscreen = isWebFullscreen;
-          });
-        },
-        onReady: _onVideoPlayerReady,
-        live: true,
-      );
-    } else {
-      return MobileVideoPlayerWidget(
-        key: ValueKey(_currentChannel.id),
-        url: videoUrl,
-        headers: <String, String>{
-          'User-Agent': _currentSource.ua.isNotEmpty
-              ? _currentSource.ua
-              : 'AptvPlayer/1.4.10',
-        },
-        videoTitle: _currentChannel.name,
-        onBackPressed: () => Navigator.pop(context),
-        onControllerCreated: (controller) {
-          _mobileVideoPlayerController = controller;
-        },
-        onReady: _onVideoPlayerReady,
-        live: true,
-      );
-    }
+    return VideoPlayerWidget(
+      surface: DeviceUtils.isPC()
+          ? VideoPlayerSurface.desktop
+          : VideoPlayerSurface.mobile,
+      key: ValueKey(_currentChannel.id),
+      url: videoUrl,
+      headers: <String, String>{
+        'User-Agent': _currentSource.ua.isNotEmpty
+            ? _currentSource.ua
+            : 'AptvPlayer/1.4.10',
+      },
+      videoTitle: _currentChannel.name,
+      onBackPressed:
+          _isWebFullscreen ? _exitWebFullscreen : () => Navigator.pop(context),
+      onControllerCreated: (controller) {
+        _videoPlayerController = controller;
+      },
+      onWebFullscreenChanged: (isWebFullscreen) {
+        setState(() {
+          _isWebFullscreen = isWebFullscreen;
+        });
+      },
+      onReady: _onVideoPlayerReady,
+      live: true,
+    );
   }
 
   /// 构建手机模式布局

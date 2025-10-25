@@ -2,16 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'custom_better_player_controls.dart';
-import 'custom_media_kit_controls.dart';
+import 'mobile_player_controls.dart';
+import 'pc_player_controls.dart';
 import 'video_player_surface.dart';
 
-class FFmpegVideoPlayerWidget extends StatefulWidget {
+class VideoPlayerWidget extends StatefulWidget {
   final VideoPlayerSurface surface;
   final String? url;
   final Map<String, String>? headers;
   final VoidCallback? onBackPressed;
-  final Function(FFmpegVideoPlayerWidgetController)? onControllerCreated;
+  final Function(VideoPlayerWidgetController)? onControllerCreated;
   final VoidCallback? onReady;
   final VoidCallback? onNextEpisode;
   final VoidCallback? onVideoCompleted;
@@ -25,7 +25,7 @@ class FFmpegVideoPlayerWidget extends StatefulWidget {
   final Function(bool isWebFullscreen)? onWebFullscreenChanged;
   final bool live;
 
-  const FFmpegVideoPlayerWidget({
+  const VideoPlayerWidget({
     super.key,
     this.surface = VideoPlayerSurface.mobile,
     this.url,
@@ -47,12 +47,12 @@ class FFmpegVideoPlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<FFmpegVideoPlayerWidget> createState() => _FFmpegVideoPlayerWidgetState();
+  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
 }
 
-class FFmpegVideoPlayerWidgetController {
-  FFmpegVideoPlayerWidgetController._(this._state);
-  final _FFmpegVideoPlayerWidgetState _state;
+class VideoPlayerWidgetController {
+  VideoPlayerWidgetController._(this._state);
+  final _VideoPlayerWidgetState _state;
 
   Future<void> updateDataSource(
     String url, {
@@ -113,7 +113,7 @@ class FFmpegVideoPlayerWidgetController {
   }
 }
 
-class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
+class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     with WidgetsBindingObserver {
   Player? _player;
   VideoController? _videoController;
@@ -138,11 +138,11 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
     _currentUrl = widget.url;
     _currentHeaders = widget.headers;
     _initializePlayer();
-    widget.onControllerCreated?.call(FFmpegVideoPlayerWidgetController._(this));
+    widget.onControllerCreated?.call(VideoPlayerWidgetController._(this));
   }
 
   @override
-  void didUpdateWidget(covariant FFmpegVideoPlayerWidget oldWidget) {
+  void didUpdateWidget(covariant VideoPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.headers != oldWidget.headers && widget.headers != null) {
       _currentHeaders = widget.headers;
@@ -190,7 +190,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
       });
       // widget.onReady?.call();
     } catch (error) {
-      debugPrint('FFmpegVideoPlayerWidget: failed to open media $error');
+      debugPrint('VideoPlayerWidget: failed to open media $error');
       if (mounted) {
         setState(() {
           _isLoadingVideo = false;
@@ -213,7 +213,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
         try {
           listener();
         } catch (error) {
-          debugPrint('FFmpegVideoPlayerWidget: progress listener error $error');
+          debugPrint('VideoPlayerWidget: progress listener error $error');
         }
       }
     });
@@ -292,7 +292,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
       }
       // widget.onReady?.call();
     } catch (error) {
-      debugPrint('FFmpegVideoPlayerWidget: error while changing source $error');
+      debugPrint('VideoPlayerWidget: error while changing source $error');
       if (mounted) {
         setState(() {
           _isLoadingVideo = false;
@@ -377,7 +377,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
               controller: _videoController!,
               controls: (state) {
                 return widget.surface == VideoPlayerSurface.desktop
-                    ? CustomMediaKitControls(
+                    ? PCPlayerControls(
                         state: state,
                         player: _player!,
                         onBackPressed: widget.onBackPressed,
@@ -399,7 +399,7 @@ class _FFmpegVideoPlayerWidgetState extends State<FFmpegVideoPlayerWidget>
                         playbackSpeedListenable: _playbackSpeed,
                         onSetSpeed: _setPlaybackSpeed,
                       )
-                    : CustomBetterPlayerControls(
+                    : MobilePlayerControls(
                         player: _player!,
                         state: state,
                         onControlsVisibilityChanged: (_) {},

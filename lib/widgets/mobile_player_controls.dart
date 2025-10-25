@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dlna_device_dialog.dart';
 
-class CustomBetterPlayerControls extends StatefulWidget {
+class MobilePlayerControls extends StatefulWidget {
   final Player player;
   final VideoState state;
   final Function(bool) onControlsVisibilityChanged;
@@ -27,7 +26,7 @@ class CustomBetterPlayerControls extends StatefulWidget {
   final ValueNotifier<double> playbackSpeedListenable;
   final Future<void> Function(double speed) onSetSpeed;
 
-  const CustomBetterPlayerControls({
+  const MobilePlayerControls({
     super.key,
     required this.player,
     required this.state,
@@ -50,10 +49,10 @@ class CustomBetterPlayerControls extends StatefulWidget {
   });
 
   @override
-  State<CustomBetterPlayerControls> createState() => _CustomBetterPlayerControlsState();
+  State<MobilePlayerControls> createState() => _MobilePlayerControlsState();
 }
 
-class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls> {
+class _MobilePlayerControlsState extends State<MobilePlayerControls> {
   final List<StreamSubscription> _subscriptions = [];
   Timer? _hideTimer;
   bool _controlsVisible = true;
@@ -193,7 +192,7 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
   }
 
   void _onLongPressStart(LongPressStartDetails details) {
-    if (widget.live || !_isPlaying) return;
+    if (_isLocked || widget.live || !_isPlaying) return;
     setState(() {
       _isLongPressing = true;
       _originalPlaybackSpeed = widget.playbackSpeedListenable.value;
@@ -202,13 +201,13 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
   }
 
   void _onLongPressEnd(LongPressEndDetails details) {
-    if (!_isLongPressing || widget.live) return;
+    if (_isLocked || !_isLongPressing || widget.live) return;
     widget.onSetSpeed(_originalPlaybackSpeed);
     setState(() => _isLongPressing = false);
   }
 
   void _onSwipeStart(DragStartDetails details) {
-    if (widget.live) return;
+    if (_isLocked || widget.live) return;
     _screenSize ??= MediaQuery.of(context).size;
     setState(() {
       _isSeekingViaSwipe = true;
@@ -221,23 +220,26 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
   }
 
   void _onSwipeUpdate(DragUpdateDetails details) {
-    if (!_isSeekingViaSwipe || widget.live || _screenSize == null) return;
+    if (_isLocked || !_isSeekingViaSwipe || widget.live || _screenSize == null)
+      return;
     final screenWidth = _screenSize!.width;
     final swipeDistance = details.globalPosition.dx - _swipeStartX;
     final swipeRatio = swipeDistance / (screenWidth * 0.5);
     final duration = _duration;
     if (duration == Duration.zero) return;
-    final targetPosition = _swipeStartPosition + Duration(
-      milliseconds: (duration.inMilliseconds * swipeRatio * 0.1).round(),
-    );
+    final targetPosition = _swipeStartPosition +
+        Duration(
+          milliseconds: (duration.inMilliseconds * swipeRatio * 0.1).round(),
+        );
     final clamped = Duration(
-      milliseconds: targetPosition.inMilliseconds.clamp(0, duration.inMilliseconds),
+      milliseconds:
+          targetPosition.inMilliseconds.clamp(0, duration.inMilliseconds),
     );
     setState(() => _dragPosition = clamped);
   }
 
   void _onSwipeEnd(DragEndDetails details) {
-    if (!_isSeekingViaSwipe || widget.live) return;
+    if (_isLocked || !_isSeekingViaSwipe || widget.live) return;
     if (_dragPosition != null) {
       widget.player.seek(_dragPosition!);
     }
@@ -294,7 +296,8 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
     final screenHeight = MediaQuery.of(context).size.height;
     final brightnessChange = -(details.delta.dy / screenHeight) * 2;
     setState(() {
-      _currentBrightness = (_currentBrightness + brightnessChange).clamp(0.0, 1.0);
+      _currentBrightness =
+          (_currentBrightness + brightnessChange).clamp(0.0, 1.0);
       _showBrightnessIndicator = true;
     });
     ScreenBrightness().setScreenBrightness(_currentBrightness);
@@ -419,7 +422,8 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
             children: [
               CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
               SizedBox(height: 16),
-              Text('视频加载中...', style: TextStyle(color: Colors.white, fontSize: 14)),
+              Text('视频加载中...',
+                  style: TextStyle(color: Colors.white, fontSize: 14)),
             ],
           ),
         ),
@@ -650,7 +654,8 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
     return Positioned.fill(
       child: Center(
         child: AnimatedOpacity(
-          opacity: (!_isLocked && (!_isPlaying || _controlsVisible)) ? 1.0 : 0.0,
+          opacity:
+              (!_isLocked && (!_isPlaying || _controlsVisible)) ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 200),
           child: IgnorePointer(
             ignoring: _isLocked || (_isPlaying && !_controlsVisible),
@@ -764,7 +769,8 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Text(
                         '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
                   ),
@@ -816,7 +822,11 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('2x', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('2x',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
           SizedBox(width: 6),
           Icon(Icons.fast_forward, color: Colors.white, size: 32),
         ],
@@ -840,7 +850,9 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _currentBrightness < 0.5 ? Icons.brightness_low : Icons.brightness_high,
+                _currentBrightness < 0.5
+                    ? Icons.brightness_low
+                    : Icons.brightness_high,
                 color: Colors.white,
                 size: 24,
               ),
@@ -874,7 +886,10 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
               const SizedBox(height: 8),
               Text(
                 '${(_currentBrightness * 100).round()}',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -938,7 +953,10 @@ class _CustomBetterPlayerControlsState extends State<CustomBetterPlayerControls>
                 const SizedBox(height: 8),
                 Text(
                   '${(_currentVolume * 100).round()}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -1008,7 +1026,8 @@ class _MobileVideoProgressBar extends StatefulWidget {
   });
 
   @override
-  State<_MobileVideoProgressBar> createState() => _MobileVideoProgressBarState();
+  State<_MobileVideoProgressBar> createState() =>
+      _MobileVideoProgressBarState();
 }
 
 class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
@@ -1098,7 +1117,8 @@ class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
             builder: (context, constraints) {
               final progressWidth = constraints.maxWidth;
               final progressValue = value.clamp(0.0, 1.0);
-              final thumbPosition = (progressValue * progressWidth).clamp(8.0, progressWidth - 8.0);
+              final thumbPosition = (progressValue * progressWidth)
+                  .clamp(8.0, progressWidth - 8.0);
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -1167,7 +1187,8 @@ class _MobileVideoProgressBarState extends State<_MobileVideoProgressBar> {
     setState(() => _dragValue = value);
     if (!widget.live) {
       final duration = widget.player.state.duration;
-      final position = Duration(milliseconds: (value * duration.inMilliseconds).round());
+      final position =
+          Duration(milliseconds: (value * duration.inMilliseconds).round());
       widget.onPositionUpdate?.call(position);
     }
   }
