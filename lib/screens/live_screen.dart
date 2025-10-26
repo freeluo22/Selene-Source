@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:selene/services/live_service.dart';
 import '../models/live_channel.dart';
 import '../models/live_source.dart';
-import '../services/api_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/device_utils.dart';
 import '../services/theme_service.dart';
@@ -54,7 +54,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
     try {
       // 1. 获取所有直播源
-      final liveSources = await ApiService.getLiveSources();
+      final liveSources = await LiveService.getLiveSources();
 
       if (liveSources.isEmpty) {
         if (mounted) {
@@ -72,7 +72,7 @@ class _LiveScreenState extends State<LiveScreen> {
       final targetSource = source ?? _currentSource ?? liveSources.first;
 
       // 3. 获取该直播源的频道列表
-      final channels = await ApiService.getLiveChannels(targetSource.key);
+      final channels = await LiveService.getLiveChannels(targetSource.key);
 
       if (channels.isEmpty) {
         if (mounted) {
@@ -129,8 +129,9 @@ class _LiveScreenState extends State<LiveScreen> {
     });
 
     try {
+      LiveService.clearAllChannelsAndEpgCache();
       // 1. 重新获取所有直播源
-      final liveSources = await ApiService.getLiveSources();
+      final liveSources = await LiveService.getLiveSources(forceRefresh: true);
 
       if (liveSources.isEmpty) {
         if (mounted) {
@@ -165,7 +166,7 @@ class _LiveScreenState extends State<LiveScreen> {
       }
 
       // 3. 获取目标源的频道列表
-      final channels = await ApiService.getLiveChannels(targetSource.key);
+      final channels = await LiveService.getLiveChannels(targetSource.key);
 
       if (channels.isEmpty) {
         if (mounted) {
