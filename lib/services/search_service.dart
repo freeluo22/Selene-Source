@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/search_result.dart';
+import '../models/search_resource.dart';
 import 'api_service.dart';
 import 'downstream_service.dart';
 import '../services/user_data_service.dart';
@@ -8,17 +9,100 @@ import '../services/local_mode_storage_service.dart';
 
 /// 搜索服务
 class SearchService {
+  // 内存缓存
+  static List<SearchResource>? _cachedResources;
+  static bool _isRefreshing = false;
+
+  /// 获取搜索资源列表（带缓存）
+  /// 本地模式直接返回，服务器模式先返回缓存数据然后异步刷新
+  static Future<List<SearchResource>> _getSearchResourcesWithCache() async {
+    final isLocalMode = await UserDataService.getIsLocalMode();
+
+    // 本地模式不使用缓存，直接返回
+    if (isLocalMode) {
+      return await LocalModeStorageService.getSubscriptionContent();
+    }
+
+    // 服务器模式使用缓存
+    // 如果有缓存，立即返回缓存数据
+    if (_cachedResources != null) {
+      // 异步刷新缓存（不等待）
+      if (!_isRefreshing) {
+        _refreshCache();
+      }
+      return _cachedResources!;
+    }
+
+    // 如果没有缓存，同步获取并缓存
+    return await _refreshCache();
+  }
+
+  /// 刷新缓存（仅用于服务器模式）
+  static Future<List<SearchResource>> _refreshCache() async {
+    if (_isRefreshing) {
+      // 如果正在刷新，等待当前刷新完成
+      while (_isRefreshing) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return _cachedResources ?? [];
+    }
+
+    _isRefreshing = true;
+    try {
+      final resources = await ApiService.getSearchResources();
+      _cachedResources = resources;
+      return resources;
+    } catch (e) {
+      return _cachedResources ?? [];
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  /// 清除缓存（在需要强制刷新时调用）
+  static void clearCache() {
+    _cachedResources = null;
+  }
+
+  /// 搜索推荐（只搜索第一个资源）
+  /// 用于快速获取搜索建议
+  static Future<List<String>> searchRecommand(String query) async {
+    try {
+      // 获取搜索资源列表（使用缓存）
+      final allResources = await _getSearchResourcesWithCache();
+
+      // 过滤掉被禁用的资源
+      final resources =
+          allResources.where((resource) => !resource.disabled).toList();
+
+      if (resources.isEmpty) {
+        return [];
+      }
+
+      // 只搜索第一个资源，设置 5 秒超时
+      final firstResource = resources.first;
+      final results =
+          await DownstreamService.searchFromApi(firstResource, query)
+              .timeout(const Duration(seconds: 5))
+              .catchError((error) {
+        // 捕获错误，返回空列表
+        return <SearchResult>[];
+      });
+
+      // 提取标题列表并去重
+      final titles = results.map((result) => result.title).toSet().toList();
+      return titles;
+    } catch (e) {
+      return [];
+    }
+  }
+
   /// 同步搜索（本地搜索）
   /// 并发调用所有资源的搜索，返回所有结果
   static Future<List<SearchResult>> searchSync(String query) async {
     try {
-      // 检查是否是本地模式
-      final isLocalMode = await UserDataService.getIsLocalMode();
-
-      // 获取搜索资源列表
-      final allResources = isLocalMode
-          ? await LocalModeStorageService.getSubscriptionContent()
-          : await ApiService.getSearchResources();
+      // 获取搜索资源列表（使用缓存）
+      final allResources = await _getSearchResourcesWithCache();
 
       // 过滤掉被禁用的资源
       final resources =
@@ -59,13 +143,8 @@ class SearchService {
   static Future<List<SearchResult>> getDetailSync(
       String source, String id) async {
     try {
-      // 检查是否是本地模式
-      final isLocalMode = await UserDataService.getIsLocalMode();
-
-      // 获取搜索资源列表
-      final allResources = isLocalMode
-          ? await LocalModeStorageService.getSubscriptionContent()
-          : await ApiService.getSearchResources();
+      // 获取搜索资源列表（使用缓存）
+      final allResources = await _getSearchResourcesWithCache();
 
       // 找到对应 source 的资源
       final apiSite = allResources.firstWhere(

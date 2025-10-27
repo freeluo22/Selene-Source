@@ -10,6 +10,7 @@ import '../models/search_resource.dart';
 import '../models/live_source.dart';
 import '../models/live_channel.dart';
 import '../models/epg_program.dart';
+import '../models/search_suggestion.dart';
 
 /// API响应结果类
 class ApiResponse<T> {
@@ -727,8 +728,7 @@ class ApiService {
           final responseData = data as Map<String, dynamic>;
           final list = responseData['data'] as List<dynamic>;
           return list
-              .map((item) =>
-                  LiveChannel.fromJson(item as Map<String, dynamic>))
+              .map((item) => LiveChannel.fromJson(item as Map<String, dynamic>))
               .toList();
         },
       );
@@ -770,6 +770,35 @@ class ApiService {
     } catch (e) {
       print('获取 EPG 节目单失败: $e');
       return null;
+    }
+  }
+
+  /// 获取搜索建议
+  static Future<List<String>> getSearchSuggestions(String query) async {
+    try {
+      final response = await get<List<SearchSuggestion>>(
+        '/api/search/suggestions',
+        queryParameters: {'q': query.trim()},
+        fromJson: (data) {
+          final responseData = data as Map<String, dynamic>;
+          final list = responseData['suggestions'] as List<dynamic>;
+          return list
+              .map((item) =>
+                  SearchSuggestion.fromJson(item as Map<String, dynamic>))
+              .toList();
+        },
+      );
+
+      if (response.success && response.data != null) {
+        // 提取建议文本列表
+        return response.data!.map((suggestion) => suggestion.text).toList();
+      } else {
+        print('获取搜索建议失败: ${response.message}');
+        return [];
+      }
+    } catch (e) {
+      print('获取搜索建议失败: $e');
+      return [];
     }
   }
 
