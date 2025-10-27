@@ -122,6 +122,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   DateTime? _lastSaveTime;
   int? _lastSavePosition; // 上次保存的播放位置（秒）
   static const Duration _saveProgressInterval = Duration(seconds: 10);
+  Duration? _resumeStartAt;
 
   // 网页全屏状态
   bool _isWebFullscreen = false;
@@ -311,7 +312,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     _lastSavePosition = null;
     // 将 playTime 转换为 Duration 并传递给 updateVideoUrl
     final startAt = playTime > 0 ? Duration(seconds: playTime) : null;
-    updateVideoUrl(currentDetail!.episodes[targetIndex], startAt: startAt);
+    _resumeStartAt = startAt;
+    updateVideoUrl(currentDetail!.episodes[targetIndex], startAt: null);
     _scrollToCurrentEpisode();
   }
 
@@ -495,7 +497,6 @@ class _PlayerScreenState extends State<PlayerScreen>
 
       final playTime = currentPosition.inSeconds;
       final totalTime = duration.inSeconds;
-
       // 如果不是强制保存，检查时间间隔和进度变化
       if (!force) {
         final now = DateTime.now();
@@ -710,6 +711,17 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     // 添加视频播放状态监听器来触发保存检查
     _addVideoProgressListener();
+
+    // 延时三秒 seek 到 _resumeStartAt
+    if (_resumeStartAt != null) {
+      final tmpStartAt = _resumeStartAt;
+      _resumeStartAt = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (tmpStartAt != null) {
+          seekToProgress(tmpStartAt);
+        }
+      });
+    }
   }
 
   /// 添加视频播放进度监听器
