@@ -29,6 +29,7 @@ class _LiveScreenState extends State<LiveScreen>
   String _selectedGroup = '全部';
   final ScrollController _scrollController = ScrollController();
   late AnimationController _refreshIconController;
+  bool _isRefreshButtonHovered = false;
 
   @override
   void initState() {
@@ -142,6 +143,7 @@ class _LiveScreenState extends State<LiveScreen>
 
   Future<void> refreshChannels() async {
     setState(() {
+      _isRefreshButtonHovered = false;
       _isRefreshing = true;
       _errorMessage = null;
     });
@@ -313,7 +315,7 @@ class _LiveScreenState extends State<LiveScreen>
     final showGroupFilter = !_isInitialLoad && _channelGroups.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       decoration: BoxDecoration(
         color: themeService.isDarkMode
             ? const Color(0xFF1e1e1e).withValues(alpha: 0.9)
@@ -359,22 +361,47 @@ class _LiveScreenState extends State<LiveScreen>
           // 刷新按钮
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: RotationTransition(
-              turns: _refreshIconController,
-              child: IconButton(
-                icon: Icon(
-                  Icons.refresh,
-                  size: 20,
-                  color: _isRefreshing
-                      ? const Color(0xFF27ae60)
-                      : (themeService.isDarkMode
-                          ? Colors.grey[600]
-                          : Colors.grey[500]),
+            child: MouseRegion(
+              cursor: DeviceUtils.isPC() && !_isRefreshing
+                  ? SystemMouseCursors.click
+                  : MouseCursor.defer,
+              onEnter: DeviceUtils.isPC() && !_isRefreshing
+                  ? (_) {
+                      setState(() {
+                        _isRefreshButtonHovered = true;
+                      });
+                    }
+                  : null,
+              onExit: DeviceUtils.isPC() && !_isRefreshing
+                  ? (_) {
+                      setState(() {
+                        _isRefreshButtonHovered = false;
+                      });
+                    }
+                  : null,
+              child: GestureDetector(
+                onTap: _isRefreshing ? null : refreshChannels,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: RotationTransition(
+                      turns: _refreshIconController,
+                      child: Icon(
+                        Icons.refresh,
+                        size: 20,
+                        color: _isRefreshing
+                            ? const Color(0xFF27ae60)
+                            : (DeviceUtils.isPC() && _isRefreshButtonHovered
+                                ? const Color(0xFF27ae60)
+                                : (themeService.isDarkMode
+                                    ? Colors.grey[600]
+                                    : Colors.grey[500])),
+                      ),
+                    ),
+                  ),
                 ),
-                tooltip: '刷新直播源',
-                onPressed: _isRefreshing ? null : refreshChannels,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
               ),
             ),
           ),
@@ -596,7 +623,7 @@ class _LiveScreenState extends State<LiveScreen>
               ),
             ),
             child: Text(
-              '从 MoonTV 获取',
+              '刷新',
               style: FontUtils.poppins(color: Colors.white),
             ),
           ),
@@ -631,7 +658,7 @@ class _LiveScreenState extends State<LiveScreen>
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: childAspectRatio,
-        crossAxisSpacing: 12,
+        crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: channels.length,
@@ -642,7 +669,9 @@ class _LiveScreenState extends State<LiveScreen>
   }
 
   Widget _buildChannelCard(LiveChannel channel, ThemeService themeService) {
-    return GestureDetector(
+    return _LiveChannelCard(
+      channel: channel,
+      themeService: themeService,
       onTap: () {
         Navigator.push(
           context,
@@ -654,49 +683,7 @@ class _LiveScreenState extends State<LiveScreen>
           ),
         ).then((_) => _loadChannels());
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 卡片主体 - 2:1 长宽比
-          Expanded(
-            child: AspectRatio(
-              aspectRatio: 2.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: themeService.isDarkMode
-                      ? const Color(0xFF1e1e1e)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: _buildChannelLogo(channel, themeService),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // 标题 - 放在卡片下方居中
-          const SizedBox(height: 8),
-          Text(
-            channel.name,
-            style: FontUtils.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: themeService.isDarkMode
-                  ? Colors.white
-                  : const Color(0xFF2c3e50),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+      buildChannelLogo: _buildChannelLogo,
     );
   }
 
@@ -745,6 +732,92 @@ class _LiveScreenState extends State<LiveScreen>
           color: themeService.isDarkMode
               ? const Color(0xFF666666)
               : const Color(0xFF95a5b0),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveChannelCard extends StatefulWidget {
+  final LiveChannel channel;
+  final ThemeService themeService;
+  final VoidCallback onTap;
+  final Widget Function(LiveChannel, ThemeService) buildChannelLogo;
+
+  const _LiveChannelCard({
+    required this.channel,
+    required this.themeService,
+    required this.onTap,
+    required this.buildChannelLogo,
+  });
+
+  @override
+  State<_LiveChannelCard> createState() => _LiveChannelCardState();
+}
+
+class _LiveChannelCardState extends State<_LiveChannelCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPC = DeviceUtils.isPC();
+
+    return MouseRegion(
+      cursor: isPC ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: isPC ? (_) => setState(() => _isHovered = true) : null,
+      onExit: isPC ? (_) => setState(() => _isHovered = false) : null,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: isPC && _isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 卡片主体 - 2:1 长宽比
+              Expanded(
+                child: AspectRatio(
+                  aspectRatio: 2.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: widget.themeService.isDarkMode
+                          ? const Color(0xFF1e1e1e)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: widget.buildChannelLogo(
+                              widget.channel, widget.themeService),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // 标题 - 放在卡片下方居中
+              const SizedBox(height: 8),
+              Text(
+                widget.channel.name,
+                style: FontUtils.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isPC && _isHovered
+                      ? const Color(0xFF27ae60)
+                      : (widget.themeService.isDarkMode
+                          ? Colors.white
+                          : const Color(0xFF2c3e50)),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
