@@ -24,6 +24,7 @@ class _LiveScreenState extends State<LiveScreen>
   LiveSource? _currentSource;
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _isInitialLoad = true; // 标记是否是首次加载
   String? _errorMessage;
   String _selectedGroup = '全部';
   final ScrollController _scrollController = ScrollController();
@@ -71,6 +72,7 @@ class _LiveScreenState extends State<LiveScreen>
           setState(() {
             _errorMessage = '暂无直播源，请在 MoonTV 添加';
             _isLoading = false;
+            _isInitialLoad = false;
             _liveSources = [];
             _currentSource = null;
           });
@@ -81,6 +83,15 @@ class _LiveScreenState extends State<LiveScreen>
       // 2. 确定要使用的直播源
       final targetSource = source ?? _currentSource ?? liveSources.first;
 
+      // 在确定加载源后立即展示源筛选（更新状态）
+      if (mounted) {
+        setState(() {
+          _liveSources = liveSources;
+          _currentSource = targetSource;
+          _isInitialLoad = false;
+        });
+      }
+
       // 3. 获取该直播源的频道列表
       final channels = await LiveService.getLiveChannels(targetSource.key);
 
@@ -89,8 +100,6 @@ class _LiveScreenState extends State<LiveScreen>
           setState(() {
             _errorMessage = '该直播源暂无频道';
             _isLoading = false;
-            _liveSources = liveSources;
-            _currentSource = targetSource;
           });
         }
         return;
@@ -117,8 +126,6 @@ class _LiveScreenState extends State<LiveScreen>
       if (mounted) {
         setState(() {
           _channelGroups = groups;
-          _liveSources = liveSources;
-          _currentSource = targetSource;
           _isLoading = false;
         });
       }
@@ -127,6 +134,7 @@ class _LiveScreenState extends State<LiveScreen>
         setState(() {
           _errorMessage = '加载失败: $e';
           _isLoading = false;
+          _isInitialLoad = false;
         });
       }
     }
@@ -150,7 +158,6 @@ class _LiveScreenState extends State<LiveScreen>
         if (mounted) {
           setState(() {
             _errorMessage = '暂无直播源，请在 MoonTV 添加';
-            _isLoading = false;
             _liveSources = [];
             _currentSource = null;
           });
@@ -185,7 +192,6 @@ class _LiveScreenState extends State<LiveScreen>
         if (mounted) {
           setState(() {
             _errorMessage = '该直播源暂无频道';
-            _isLoading = false;
             _liveSources = liveSources;
             _currentSource = targetSource;
           });
@@ -216,7 +222,6 @@ class _LiveScreenState extends State<LiveScreen>
           _channelGroups = groups;
           _liveSources = liveSources;
           _currentSource = targetSource;
-          _isLoading = false;
         });
         // _showMessage('刷新成功');
       }
@@ -224,7 +229,6 @@ class _LiveScreenState extends State<LiveScreen>
       if (mounted) {
         setState(() {
           _errorMessage = '刷新失败: $e';
-          _isLoading = false;
         });
         _showMessage('刷新失败: $e');
       }
@@ -276,11 +280,13 @@ class _LiveScreenState extends State<LiveScreen>
           children: [
             _buildTopBar(themeService),
             Expanded(
-              child: _isLoading
-                  ? _buildLoadingView(themeService)
-                  : _errorMessage != null
-                      ? _buildErrorView(themeService)
-                      : _buildChannelList(themeService),
+              child: _isRefreshing
+                  ? _buildRefreshingView(themeService)
+                  : _isLoading
+                      ? _buildLoadingView(themeService)
+                      : _errorMessage != null
+                          ? _buildErrorView(themeService)
+                          : _buildChannelList(themeService),
             ),
           ],
         );
@@ -303,6 +309,9 @@ class _LiveScreenState extends State<LiveScreen>
     // 判断是否只有一个直播源
     final showSourceFilter = _liveSources.length > 1;
 
+    // 首次加载时隐藏分组筛选
+    final showGroupFilter = !_isInitialLoad && _channelGroups.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       decoration: BoxDecoration(
@@ -320,29 +329,32 @@ class _LiveScreenState extends State<LiveScreen>
               _currentSource?.key ?? '',
               (value) {
                 final source = _liveSources.firstWhere((s) => s.key == value);
-                _loadChannels(source: source);
+                // 立即更新选中的源
                 setState(() {
+                  _currentSource = source;
                   _selectedGroup = '全部';
                 });
+                _loadChannels(source: source);
                 _scrollToTop();
               },
               themeService,
             ),
             const SizedBox(width: 8),
           ],
-          // 分组筛选
-          _buildFilterPill(
-            '分组',
-            groupOptions,
-            _selectedGroup,
-            (value) {
-              setState(() {
-                _selectedGroup = value;
-              });
-              _scrollToTop();
-            },
-            themeService,
-          ),
+          // 分组筛选（首次加载完成后才显示）
+          if (showGroupFilter)
+            _buildFilterPill(
+              '分组',
+              groupOptions,
+              _selectedGroup,
+              (value) {
+                setState(() {
+                  _selectedGroup = value;
+                });
+                _scrollToTop();
+              },
+              themeService,
+            ),
           const Spacer(),
           // 刷新按钮
           Padding(
@@ -520,6 +532,28 @@ class _LiveScreenState extends State<LiveScreen>
           const SizedBox(height: 16),
           Text(
             '加载中...',
+            style: FontUtils.poppins(
+              color: themeService.isDarkMode
+                  ? const Color(0xFFb0b0b0)
+                  : const Color(0xFF7f8c8d),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRefreshingView(ThemeService themeService) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF27ae60)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '刷新中...',
             style: FontUtils.poppins(
               color: themeService.isDarkMode
                   ? const Color(0xFFb0b0b0)
