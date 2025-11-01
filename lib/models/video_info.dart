@@ -61,6 +61,31 @@ class VideoInfo {
     );
   }
 
+  /// 从FavoriteItem创建VideoInfo
+  factory VideoInfo.fromFavoriteItem(dynamic favoriteItem, {
+    String? doubanId,
+    int? bangumiId,
+    String? rate,
+  }) {
+    return VideoInfo(
+      id: favoriteItem.id,
+      source: favoriteItem.source,
+      title: favoriteItem.title,
+      sourceName: favoriteItem.sourceName,
+      year: favoriteItem.year,
+      cover: favoriteItem.cover,
+      index: 0,
+      totalEpisodes: favoriteItem.totalEpisodes,
+      playTime: 0,
+      totalTime: 0,
+      saveTime: favoriteItem.saveTime,
+      searchTitle: '',
+      doubanId: doubanId,
+      bangumiId: bangumiId,
+      rate: rate,
+    );
+  }
+
   /// 从JSON创建VideoInfo
   factory VideoInfo.fromJson(String key, Map<String, dynamic> json) {
     // 从key中分离source和id，格式为 "source+id"

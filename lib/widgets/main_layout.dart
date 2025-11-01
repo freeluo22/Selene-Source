@@ -10,7 +10,9 @@ import '../utils/font_utils.dart';
 import 'user_menu.dart';
 import 'dart:io' show Platform;
 import 'dart:async';
+import 'dart:math' as math;
 import 'windows_title_bar.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 class MainLayout extends StatefulWidget {
   final Widget content;
@@ -55,9 +57,6 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   bool _isSearchButtonPressed = false;
   bool _showUserMenu = false;
-
-  // 用于跟踪底部导航栏按钮的 hover 状态
-  int? _hoveredNavIndex;
 
   // 用于跟踪搜索按钮的 hover 状态
   bool _isSearchButtonHovered = false;
@@ -284,56 +283,53 @@ class _MainLayoutState extends State<MainLayout> {
             body: Stack(
               children: [
                 // 主要内容区域
-                Column(
-                  children: [
-                    // 主内容区域（包含header和content）
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: themeService.isDarkMode
-                              ? const Color(0xFF000000) // 深色模式纯黑色
+                Container(
+                  decoration: BoxDecoration(
+                    color: themeService.isDarkMode
+                        ? const Color(0xFF000000) // 深色模式纯黑色
+                        : null,
+                    gradient: themeService.isDarkMode
+                        ? null
+                        : const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0xFFe6f3fb), // 浅色模式渐变
+                              Color(0xFFeaf3f7),
+                              Color(0xFFf7f7f3),
+                              Color(0xFFe9ecef),
+                              Color(0xFFdbe3ea),
+                              Color(0xFFd3dde6),
+                            ],
+                            stops: [0.0, 0.18, 0.38, 0.60, 0.80, 1.0],
+                          ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Windows 自定义标题栏
+                      if (Platform.isWindows)
+                        WindowsTitleBar(
+                          customBackgroundColor: widget.isSearchMode
+                              ? (themeService.isDarkMode
+                                  ? const Color(0xFF121212)
+                                  : const Color(0xFFf5f5f5))
                               : null,
-                          gradient: themeService.isDarkMode
-                              ? null
-                              : const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Color(0xFFe6f3fb), // 浅色模式渐变
-                                    Color(0xFFeaf3f7),
-                                    Color(0xFFf7f7f3),
-                                    Color(0xFFe9ecef),
-                                    Color(0xFFdbe3ea),
-                                    Color(0xFFd3dde6),
-                                  ],
-                                  stops: [0.0, 0.18, 0.38, 0.60, 0.80, 1.0],
-                                ),
                         ),
-                        child: Column(
-                          children: [
-                            // Windows 自定义标题栏
-                            if (Platform.isWindows)
-                              WindowsTitleBar(
-                                customBackgroundColor: widget.isSearchMode
-                                    ? (themeService.isDarkMode
-                                        ? const Color(0xFF121212)
-                                        : const Color(0xFFf5f5f5))
-                                    : null,
-                              ),
-                            // 固定 Header
-                            _buildHeader(context, themeService),
-                            // 主要内容区域
-                            Expanded(
-                              child: widget.content,
-                            ),
-                          ],
-                        ),
+                      // 主要内容区域
+                      Expanded(
+                        child: widget.content,
                       ),
-                    ),
-                    // 底部导航栏（可选）
-                    if (widget.showBottomNav) _buildBottomNavBar(themeService),
-                  ],
+                    ],
+                  ),
                 ),
+                // 悬浮底部导航栏
+                if (widget.showBottomNav)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildBottomNavBar(themeService),
+                  ),
                 // 用户菜单覆盖层 - 现在会覆盖整个屏幕包括navbar
                 if (_showUserMenu)
                   UserMenu(
@@ -884,124 +880,145 @@ class _MainLayoutState extends State<MainLayout> {
   Widget _buildBottomNavBar(ThemeService themeService) {
     final List<Map<String, dynamic>> navItems = [
       {'icon': LucideIcons.house, 'label': '首页'},
-      {'icon': LucideIcons.video, 'label': '电影'},
-      {'icon': LucideIcons.tv, 'label': '剧集'},
-      {'icon': LucideIcons.cat, 'label': '动漫'},
-      {'icon': LucideIcons.clover, 'label': '综艺'},
+      {'icon': LucideIcons.compass, 'label': '发现'},
       {'icon': LucideIcons.radio, 'label': '直播'},
     ];
 
     final isTablet = DeviceUtils.isTablet(context);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: themeService.isDarkMode
-            ? const Color(0xFF1e1e1e).withOpacity(0.9)
-            : Colors.white.withOpacity(0.9),
-        border: Border(
-          top: BorderSide(
-            color: themeService.isDarkMode
-                ? const Color(0xFF333333).withOpacity(0.3)
-                : Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-      ),
+    // 计算导航栏宽度 - 非平板设备缩小宽度
+    final navBarWidth = isTablet ? 300.0 : 200.0;
+    
+    // 非平板设备缩小高度
+    final navBarHeight = isTablet ? 64.0 : 48.0;
+    
+    // 非平板设备缩小图标和文字
+    final iconSize = isTablet ? 24.0 : 18.0;
+    final fontSize = isTablet ? 11.0 : 9.0;
+    final verticalPadding = isTablet ? 5.5 : 3.0;
+    final iconTextSpacing = isTablet ? 4.0 : 2.0;
+
+    return Padding(
       padding: EdgeInsets.only(
-        left: 0,
-        right: 0,
-        top: 8,
-        bottom: MediaQuery.of(context).padding.bottom + 8, // 手动处理底部安全区域
+        left: 20,
+        right: 20,
+        bottom: bottomPadding + 20,
       ),
-      child: Row(
-        mainAxisAlignment:
-            isTablet ? MainAxisAlignment.center : MainAxisAlignment.spaceEvenly,
-        children: [
-          // 平板模式下添加左侧空白
-          if (isTablet) const Spacer(flex: 3),
+      child: Center(
+        child: LiquidGlassLayer(
+          settings: LiquidGlassSettings(
+            refractiveIndex: 1.21,
+            thickness: 30,
+            blur: 8,
+            saturation: 1.5,
+            lightIntensity: themeService.isDarkMode ? 0.7 : 1.0,
+            ambientStrength: themeService.isDarkMode ? 0.2 : 0.5,
+            lightAngle: math.pi / 4,
+            glassColor: themeService.isDarkMode
+                ? const Color(0xFF1e1e1e).withOpacity(0.6)
+                : Colors.white.withOpacity(0.6),
+          ),
+          child: LiquidGlassBlendGroup(
+            blend: 10,
+            child: LiquidGlass.grouped(
+              clipBehavior: Clip.none,
+              shape: const LiquidRoundedSuperellipse(
+                borderRadius: 32,
+              ),
+              child: Container(
+                width: navBarWidth,
+                height: navBarHeight,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.transparent,
+                    width: 0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: navItems.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  Map<String, dynamic> item = entry.value;
+                  bool isSelected = !widget.isSearchMode &&
+                      widget.currentBottomNavIndex == index;
 
-          // 导航按钮
-          ...navItems.asMap().entries.expand((entry) {
-            int index = entry.key;
-            Map<String, dynamic> item = entry.value;
-            bool isSelected =
-                !widget.isSearchMode && widget.currentBottomNavIndex == index;
-            bool isHovered = DeviceUtils.isPC() && _hoveredNavIndex == index;
+                  final iconColor = isSelected
+                      ? const Color(0xFF27ae60)
+                      : (themeService.isDarkMode
+                          ? Colors.white
+                          : const Color(0xFF5f6c7d));
 
-            return [
-              MouseRegion(
-                cursor: DeviceUtils.isPC()
-                    ? SystemMouseCursors.click
-                    : MouseCursor.defer,
-                onEnter: DeviceUtils.isPC()
-                    ? (_) {
-                        setState(() {
-                          _hoveredNavIndex = index;
-                        });
-                      }
-                    : null,
-                onExit: DeviceUtils.isPC()
-                    ? (_) {
-                        setState(() {
-                          _hoveredNavIndex = null;
-                        });
-                      }
-                    : null,
-                child: GestureDetector(
-                  onTap: () {
-                    widget.onBottomNavChanged(index);
-                  },
-                  behavior: HitTestBehavior.opaque, // 确保整个区域都可以点击
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 16 : 12,
-                      vertical: 8,
-                    ),
+                  Widget navButton = Padding(
+                    padding: EdgeInsets.symmetric(vertical: verticalPadding),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(
                           item['icon'],
-                          color: isSelected
-                              ? const Color(0xFF27ae60)
-                              : isHovered
-                                  ? const Color(0xFF52c77a) // hover 时的浅绿色
-                                  : themeService.isDarkMode
-                                      ? const Color(0xFFb0b0b0)
-                                      : const Color(0xFF7f8c8d),
-                          size: 24,
+                          color: iconColor,
+                          size: iconSize,
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: iconTextSpacing),
                         Text(
                           item['label'],
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
                           style: FontUtils.poppins(
-                            fontSize: 12,
+                            fontSize: fontSize,
                             fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.w400,
-                            color: isSelected
-                                ? const Color(0xFF27ae60)
-                                : isHovered
-                                    ? const Color(0xFF52c77a) // hover 时的浅绿色
-                                    : themeService.isDarkMode
-                                        ? const Color(0xFFb0b0b0)
-                                        : const Color(0xFF7f8c8d),
+                                isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: iconColor,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-              // 平板模式下在按钮之间添加间距
-              if (isTablet && index < navItems.length - 1)
-                const SizedBox(width: 36),
-            ];
-          }),
+                  );
 
-          // 平板模式下添加右侧空白
-          if (isTablet) const Spacer(flex: 3),
-        ],
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        widget.onBottomNavChanged(index);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Semantics(
+                        button: true,
+                        label: item['label'],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          child: isSelected
+                              ? LiquidGlass.grouped(
+                                  shape: const LiquidRoundedSuperellipse(
+                                    borderRadius: 64,
+                                  ),
+                                  child: GlassGlow(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: themeService.isDarkMode
+                                            ? Colors.white.withOpacity(0.1)
+                                            : Colors.black.withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(64),
+                                      ),
+                                      child: navButton,
+                                    ),
+                                  ),
+                                )
+                              : navButton,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
       ),
+    ),
     );
   }
 }

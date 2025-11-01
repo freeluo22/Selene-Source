@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../widgets/continue_watching_section.dart';
+import '../widgets/favorite_section.dart';
 import '../widgets/hot_movies_section.dart';
 import '../widgets/hot_tv_section.dart';
 import '../widgets/hot_show_section.dart';
 import '../widgets/bangumi_section.dart';
 import '../widgets/main_layout.dart';
-import '../widgets/top_tab_switcher.dart';
 import '../widgets/favorites_grid.dart';
 import '../widgets/history_grid.dart';
 import 'search_screen.dart';
@@ -15,14 +15,12 @@ import '../widgets/video_menu_bottom_sheet.dart';
 import '../widgets/custom_refresh_indicator.dart';
 import '../models/play_record.dart';
 import '../models/video_info.dart';
+import '../models/favorite_item.dart';
 import '../utils/font_utils.dart';
 import '../services/page_cache_service.dart';
 import '../services/version_service.dart';
 import '../widgets/update_dialog.dart';
 import 'movie_screen.dart';
-import 'tv_screen.dart';
-import 'anime_screen.dart';
-import 'show_screen.dart';
 import 'player_screen.dart';
 import 'live_screen.dart';
 
@@ -37,15 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBottomNavIndex = 0;
   String _selectedTopTab = '首页';
   late PageController _pageController;
-  late PageController _bottomNavPageController;
 
   @override
   void initState() {
     super.initState();
     // 初始化 PageController，默认显示首页（索引0）
     _pageController = PageController(initialPage: 0);
-    // 初始化底栏 PageController
-    _bottomNavPageController = PageController(initialPage: 0);
     // 进入首页时直接刷新播放记录和收藏夹缓存
     _refreshCacheOnHomeEnter();
     // 检查应用更新
@@ -78,7 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _pageController.dispose();
-    _bottomNavPageController.dispose();
     super.dispose();
   }
 
@@ -125,6 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
         // 刷新继续观看组件
         await ContinueWatchingSection.refreshPlayRecords();
 
+        // 刷新收藏组件
+        await FavoriteSection.refreshFavorites();
+
         // 刷新播放历史组件
         await HistoryGrid.refreshHistory();
 
@@ -151,59 +148,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 构建首页内容（带 PageView 支持滑动切换）
+  /// 构建首页内容
   Widget _buildHomeContentWithPageView() {
-    return Column(
-      children: [
-        // 顶部导航栏
-        TopTabSwitcher(
-          selectedTab: _selectedTopTab,
-          onTabChanged: _onTopTabChanged,
-        ),
-        // PageView 支持左右滑动
-        Expanded(
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              // 根据页面索引更新选中的标签
-              String newTab;
-              switch (index) {
-                case 0:
-                  newTab = '首页';
-                  break;
-                case 1:
-                  newTab = '播放历史';
-                  break;
-                case 2:
-                  newTab = '收藏夹';
-                  break;
-                default:
-                  newTab = '首页';
-              }
-
-              // 只在标签真正改变时更新状态
-              if (_selectedTopTab != newTab) {
-                setState(() {
-                  _selectedTopTab = newTab;
-                });
-              }
-            },
-            children: [
-              // 首页内容
-              _buildHomeTabContent(),
-              // 播放历史内容
-              _buildHistoryTabContent(),
-              // 收藏夹内容
-              _buildFavoritesTabContent(),
-            ],
-          ),
-        ),
-      ],
-    );
+    return _buildHomeTabContent();
   }
 
   /// 构建首页标签内容
   Widget _buildHomeTabContent() {
+    final systemTopPadding = MediaQuery.of(context).padding.top;
+    // macOS 下需要额外的顶部 padding 来避免与透明标题栏重叠
+    final topPadding = Platform.isMacOS ? systemTopPadding + 32 : systemTopPadding;
+    
     return StyledRefreshIndicator(
       onRefresh: _refreshHomeData,
       refreshText: '刷新中...',
@@ -211,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 8),
+            SizedBox(height: topPadding + 8),
             // 继续观看组件
             ContinueWatchingSection(
               onVideoTap: _onVideoTap,
@@ -219,6 +174,15 @@ class _HomeScreenState extends State<HomeScreen> {
               onViewAll: () {
                 // 切换到播放历史标签
                 _onTopTabChanged('播放历史');
+              },
+            ),
+            // 收藏组件
+            FavoriteSection(
+              onVideoTap: _onFavoriteTap,
+              onGlobalMenuAction: _onFavoriteMenuAction,
+              onViewAll: () {
+                // 切换到收藏夹标签
+                _onTopTabChanged('收藏夹');
               },
             ),
             // 热门电影组件
@@ -257,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
-              onMoreTap: () => _onBottomNavChanged(2),
+              onMoreTap: () => _onBottomNavChanged(1),
               onGlobalMenuAction: (videoInfo, action) {
                 if (action == VideoMenuAction.play) {
                   _navigateToPlayer(
@@ -281,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
-              onMoreTap: () => _onBottomNavChanged(3),
+              onMoreTap: () => _onBottomNavChanged(1),
               onGlobalMenuAction: (videoInfo, action) {
                 if (action == VideoMenuAction.play) {
                   _navigateToPlayer(
@@ -305,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
-              onMoreTap: () => _onBottomNavChanged(4),
+              onMoreTap: () => _onBottomNavChanged(1),
               onGlobalMenuAction: (videoInfo, action) {
                 if (action == VideoMenuAction.play) {
                   _navigateToPlayer(
@@ -319,6 +283,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
             ),
+            // 底部安全距离，越过底栏
+            const SizedBox(height: 60),
           ],
         ),
       ),
@@ -396,26 +362,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建底栏 PageView，支持左右滑动切换
+  /// 构建底栏内容，使用淡入淡出切换
   Widget _buildBottomNavPageView() {
-    return PageView(
-      controller: _bottomNavPageController,
-      onPageChanged: (index) {
-        if (_currentBottomNavIndex != index) {
-          setState(() {
-            _currentBottomNavIndex = index;
-          });
-        }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeIn,
+      switchOutCurve: Curves.easeOut,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
       },
-      children: [
-        _buildHomeContentWithPageView(),
-        const MovieScreen(),
-        const TvScreen(),
-        const AnimeScreen(),
-        const ShowScreen(),
-        const LiveScreen(),
-      ],
+      child: _getPageByIndex(_currentBottomNavIndex),
     );
+  }
+
+  /// 根据索引获取对应页面
+  Widget _getPageByIndex(int index) {
+    switch (index) {
+      case 0:
+        return Container(
+          key: const ValueKey(0),
+          child: _buildHomeContentWithPageView(),
+        );
+      case 1:
+        return Container(
+          key: const ValueKey(1),
+          child: const MovieScreen(),
+        );
+      case 2:
+        return Container(
+          key: const ValueKey(2),
+          child: const LiveScreen(),
+        );
+      default:
+        return Container(
+          key: const ValueKey(0),
+          child: _buildHomeContentWithPageView(),
+        );
+    }
   }
 
   /// 处理底部导航栏切换
@@ -428,13 +414,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _currentBottomNavIndex = index;
     });
-
-    // 使用动画切换到对应页面
-    _bottomNavPageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   /// 处理顶部标签切换
@@ -509,13 +488,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedTopTab = '首页';
     });
 
-    // 使用动画切换到首页
-    _bottomNavPageController.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-
     // 同时切换顶部标签到首页
     _pageController.animateToPage(
       0,
@@ -534,6 +506,38 @@ class _HomeScreenState extends State<HomeScreen> {
         year: playRecord.year,
       ),
     );
+  }
+
+  /// 处理收藏卡片点击
+  void _onFavoriteTap(FavoriteItem favoriteItem) {
+    _navigateToPlayer(
+      PlayerScreen(
+        source: favoriteItem.source,
+        id: favoriteItem.id,
+        title: favoriteItem.title,
+        year: favoriteItem.year,
+      ),
+    );
+  }
+
+  /// 处理收藏菜单操作
+  void _onFavoriteMenuAction(FavoriteItem favoriteItem, VideoMenuAction action) {
+    // 将FavoriteItem转换为PlayRecord用于统一处理
+    final playRecord = PlayRecord(
+      id: favoriteItem.id,
+      source: favoriteItem.source,
+      title: favoriteItem.title,
+      sourceName: favoriteItem.sourceName,
+      year: favoriteItem.year,
+      cover: favoriteItem.cover,
+      index: 0,
+      totalEpisodes: favoriteItem.totalEpisodes,
+      playTime: 0,
+      totalTime: 0,
+      saveTime: favoriteItem.saveTime,
+      searchTitle: '',
+    );
+    _onGlobalMenuAction(playRecord, action);
   }
 
   /// 处理来自VideoInfo的全局菜单操作
@@ -693,9 +697,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 从播放页返回时刷新播放记录
   Future<void> _refreshOnResume() async {
     try {
-      // 通知继续观看组件和播放历史组件更新UI
+      // 通知继续观看组件、收藏组件和播放历史组件更新UI
       if (mounted) {
         ContinueWatchingSection.refreshPlayRecords();
+        FavoriteSection.refreshFavorites();
         HistoryGrid.refreshHistory();
         FavoritesGrid.refreshFavorites();
       }
