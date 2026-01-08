@@ -140,6 +140,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   VoidCallback? _exitWebFullscreenCallback;
   final Pip _pip = Pip();
   bool _isPipMode = false;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -221,6 +222,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _durationSubscription?.cancel();
 
     _positionSubscription = _player!.stream.position.listen((_) {
+      if (_isDisposed) return;
       for (final listener in List<VoidCallback>.from(_progressListeners)) {
         try {
           listener();
@@ -231,6 +233,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     });
 
     _playingSubscription = _player!.stream.playing.listen((playing) {
+      if (_isDisposed) return;
       if (!mounted) return;
       if (!playing) {
         setState(() {
@@ -258,6 +261,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
     if (!widget.live) {
       _completedSubscription = _player!.stream.completed.listen((completed) {
+        if (_isDisposed) return;
         if (!mounted) return;
         if (completed && !_hasCompleted) {
           _hasCompleted = true;
@@ -267,6 +271,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
 
     _durationSubscription = _player!.stream.duration.listen((duration) {
+      if (_isDisposed) return;
       if (!mounted) return;
       if (duration != Duration.zero) {
         if (_isLoadingVideo) {
@@ -369,6 +374,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
     _pip.registerStateChangedObserver(PipStateChangedObserver(
       onPipStateChanged: (state, error) {
+        if (_isDisposed) return;
         if (!mounted) return;
         switch (state) {
           case PipState.pipStateStarted:
@@ -432,9 +438,30 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _completedSubscription?.cancel();
     _durationSubscription?.cancel();
     _progressListeners.clear();
-    await _player?.dispose();
+    
+    final player = _player;
     _player = null;
     _videoController = null;
+
+    if (player != null) {
+      // Offload disposal to prevent blocking the UI thread and potential FFI crashes during shutdown
+      Future.microtask(() async {
+        try {
+          await player.stop();
+        } catch (e) {
+          debugPrint('VideoPlayerWidget: error stopping player $e');
+        }
+        
+        // Give some buffer time for native resources to settle before disposing
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        try {
+          await player.dispose();
+        } catch (e) {
+          debugPrint('VideoPlayerWidget: error disposing player $e');
+        }
+      });
+    }
   }
 
   @override
@@ -457,6 +484,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
+    _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
     if (Platform.isAndroid || Platform.isIOS) {
       _pip.unregisterStateChangedObserver();

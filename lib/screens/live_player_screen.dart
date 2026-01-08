@@ -260,6 +260,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 
     // 延迟执行，确保列表已经渲染
     Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
       if (!_programScrollController.hasClients) {
         return;
       }
@@ -305,6 +306,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
 
     // 使用 postFrameCallback 确保在渲染完成后立即执行
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       if (!_verticalProgramScrollController.hasClients) {
         return;
       }
