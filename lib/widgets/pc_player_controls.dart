@@ -109,6 +109,8 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
   Duration _swipeStartPosition = Duration.zero;
   StreamSubscription? _playingSubscription;
   StreamSubscription? _positionSubscription;
+  StreamSubscription? _widthSubscription;
+  StreamSubscription? _heightSubscription;
   bool _isFullscreen = false;
   bool _isWebFullscreen = false;
   bool _showSpeedMenu = false;
@@ -162,6 +164,14 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
         setState(() {});
       }
     });
+
+    _widthSubscription = widget.player.stream.width.listen((_) {
+      if (mounted) setState(() {});
+    });
+
+    _heightSubscription = widget.player.stream.height.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -197,6 +207,8 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
     _volumeMenuHideTimer?.cancel();
     _playingSubscription?.cancel();
     _positionSubscription?.cancel();
+    _widthSubscription?.cancel();
+    _heightSubscription?.cancel();
     _focusNode.dispose();
     super.dispose();
   }
@@ -890,6 +902,8 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
                               child: _buildPositionIndicator(),
                             ),
                           if (!widget.live)
+                            _buildResolutionIndicator(),
+                          if (!widget.live)
                             MouseRegion(
                               key: _speedButtonKey,
                               cursor: SystemMouseCursors.click,
@@ -976,6 +990,34 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
             // 音量调节弹窗
             if (_showVolumeMenu) _buildVolumeMenu(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResolutionIndicator() {
+    final width = widget.player.state.width;
+    final height = widget.player.state.height;
+
+    if (width == null || height == null || width == 0 || height == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          '${width}x$height',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );

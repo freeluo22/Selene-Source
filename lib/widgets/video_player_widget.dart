@@ -114,6 +114,10 @@ class VideoPlayerWidgetController {
     _state._exitWebFullscreen();
   }
 
+  int? get width => _state._player?.state.width;
+  int? get height => _state._player?.state.height;
+  String get resolution => (width != null && height != null) ? '${width}x${height}' : '未知';
+
   Future<void> dispose() async {
     await _state._externalDispose();
   }
