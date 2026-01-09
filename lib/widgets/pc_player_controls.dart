@@ -1004,7 +1004,7 @@ class _PCPlayerControlsState extends State<PCPlayerControls> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
+      padding: const EdgeInsets.only(right: 0.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(

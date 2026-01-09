@@ -484,7 +484,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
+      padding: EdgeInsets.only(right: _isFullscreen ? 34.0 : 15.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
