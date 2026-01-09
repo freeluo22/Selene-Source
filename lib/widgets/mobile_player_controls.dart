@@ -146,6 +146,14 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
       if (!mounted) return;
       setState(() {});
     }));
+
+    _subscriptions.add(widget.player.stream.width.listen((_) {
+      if (mounted) setState(() {});
+    }));
+
+    _subscriptions.add(widget.player.stream.height.listen((_) {
+      if (mounted) setState(() {});
+    }));
   }
 
   @override
@@ -465,6 +473,34 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
     _hideTimer?.cancel();
     // 调用父层的 PIP 逻辑
     await widget.onEnterPipMode();
+  }
+
+  Widget _buildResolutionIndicator() {
+    final width = widget.player.state.width;
+    final height = widget.player.state.height;
+
+    if (width == null || height == null || width == 0 || height == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          '${width}x$height',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatDuration(Duration duration) {
@@ -869,6 +905,7 @@ class _MobilePlayerControlsState extends State<MobilePlayerControls> {
                       ),
                     ),
                   ),
+                if (!widget.live) _buildResolutionIndicator(),
                 if (widget.live) const Spacer(),
                 if (!widget.live)
                   GestureDetector(
