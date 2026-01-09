@@ -970,7 +970,7 @@ class _LivePlayerScreenState extends State<LivePlayerScreen>
                       ? Colors.white
                       : const Color(0xFF2c3e50),
             ),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
