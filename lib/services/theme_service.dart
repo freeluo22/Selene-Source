@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'package:macos_window_utils/macos_window_utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeService extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
@@ -19,17 +20,54 @@ class ThemeService extends ChangeNotifier {
   }
 
   void _loadTheme() async {
-    // 每次启动都默认跟随系统主题，不保存用户的手动选择
-    _themeMode = ThemeMode.system;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final themeString = prefs.getString('theme_mode');
+      
+      switch (themeString) {
+        case 'light':
+          _themeMode = ThemeMode.light;
+          break;
+        case 'dark':
+          _themeMode = ThemeMode.dark;
+          break;
+        case 'system':
+        default:
+          _themeMode = ThemeMode.system;
+          break;
+      }
+    } catch (e) {
+      debugPrint('Failed to load theme preference: $e');
+      _themeMode = ThemeMode.system;
+    }
+    
     notifyListeners();
     _updateMacOSWindowAppearance();
   }
 
   void setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
-    // 不再保存到 SharedPreferences，每次启动都重新遵循系统主题
     notifyListeners();
     _updateMacOSWindowAppearance();
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String themeString;
+      switch (mode) {
+        case ThemeMode.light:
+          themeString = 'light';
+          break;
+        case ThemeMode.dark:
+          themeString = 'dark';
+          break;
+        case ThemeMode.system:
+          themeString = 'system';
+          break;
+      }
+      await prefs.setString('theme_mode', themeString);
+    } catch (e) {
+      debugPrint('Failed to save theme preference: $e');
+    }
   }
 
   // 更新 macOS 窗口外观
